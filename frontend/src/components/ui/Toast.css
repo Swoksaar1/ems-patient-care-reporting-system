@@ -1,0 +1,110 @@
+/* src/components/ui/Toast.css */
+
+.toast-wrap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* main toast */
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  min-width: 260px;
+  max-width: 460px;
+  padding: 12px 14px;
+  border-radius: 14px;
+
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 38px rgba(2, 6, 23, 0.14);
+
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* dot */
+.toast-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.95);
+  box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.14);
+  flex: 0 0 auto;
+}
+
+.toast-msg {
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.2;
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-x {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 10px;
+  opacity: 0.7;
+}
+.toast-x:hover {
+  opacity: 1;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+/* variants */
+.toast-success .toast-dot {
+  background: rgba(16, 185, 129, 0.95);
+  box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.14);
+}
+.toast-error .toast-dot {
+  background: rgba(239, 68, 68, 0.95);
+  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.14);
+}
+.toast-info .toast-dot {
+  background: rgba(14, 165, 233, 0.95);
+  box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.14);
+}
+
+/* animations */
+.toast-in {
+  animation: toastIn 220ms ease-out both;
+}
+.toast-out {
+  animation: toastOut 220ms ease-in both;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    filter: blur(2px);
+  }
+}

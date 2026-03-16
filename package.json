@@ -1,0 +1,75 @@
+{
+  "name": "ems-patient-care-reporting-system",
+  "version": "1.0.0",
+  "description": "EMS Patient Care Reporting System desktop app built with Electron, React, and Django",
+  "author": "Rubin",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron": "electron .",
+    "dist-win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ems.patientcare",
+    "productName": "EMS Patient Care Reporting System",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/build/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/ems_backend.exe",
+        "to": "backend/ems_backend.exe"
+      },
+      {
+        "from": "ems_system",
+        "to": "ems_system",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "reports",
+        "to": "reports",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "manage.py",
+        "to": "manage.py"
+      },
+      {
+        "from": "db.sqlite3",
+        "to": "db.sqlite3"
+      },
+      {
+        "from": "media",
+        "to": "media",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "electron/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "electron/icon.ico",
+      "uninstallerIcon": "electron/icon.ico",
+      "installerHeaderIcon": "electron/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

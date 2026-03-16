@@ -1,0 +1,29 @@
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Build / packaged output
+release/
+build/
+dist/
+frontend/build/
+
+# Python virtual environment / cache
+venv/
+__pycache__/
+*.pyc
+
+# Local database / env files
+db.sqlite3
+.env
+frontend/.env
+
+# Executables
+*.exe
+
+# Optional extras
+media/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
