@@ -148,6 +148,26 @@ select.rp-input {
   background-repeat: no-repeat;
 }
 
+.rp-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.rp-select option,
+.rp-select optgroup {
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+
+.rp-paper .rp-select option,
+.rp-paper .rp-select optgroup,
+.rp-printing .rp-select option,
+.rp-printing .rp-select optgroup {
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+
 .rp-input::placeholder {
   color: rgba(238, 246, 255, 0.42);
 }

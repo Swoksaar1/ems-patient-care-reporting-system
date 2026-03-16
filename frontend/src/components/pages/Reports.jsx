@@ -272,18 +272,27 @@ function InputKV({ label, value, onChange, placeholder, type = "text" }) {
 }
 
 function SelectKV({ label, value, onChange, options }) {
+  const optionStyle = {
+    color: "#0f172a",
+    backgroundColor: "#ffffff",
+  };
+
   return (
     <div className="rp-kv">
       <div className="rp-k">{label}</div>
       <div className="rp-v">
-        <select className="rp-input" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+        <select
+          className="rp-input rp-select"
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+        >
           {options.map((o) =>
             typeof o === "string" ? (
-              <option key={o} value={o}>
+              <option key={o} value={o} style={optionStyle}>
                 {o === NA ? "N/A" : o}
               </option>
             ) : (
-              <option key={o.value} value={o.value}>
+              <option key={o.value} value={o.value} style={optionStyle}>
                 {o.label}
               </option>
             )
@@ -1469,14 +1478,25 @@ export default function Reports() {
               />
 
               <select
-                className="rp-input"
+                className="rp-input rp-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 style={{ maxWidth: 170 }}
               >
-                <option value="all">All Status</option>
+                <option
+                  value="all"
+                  style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+                >
+                  All Status
+                </option>
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option
+                    key={s}
+                    value={s}
+                    style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+                  >
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
