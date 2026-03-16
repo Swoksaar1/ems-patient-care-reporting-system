@@ -6,7 +6,6 @@ import LoginModal from "./components/pages/LoginModal";
 import ProtectedRoute from "./ProtectedRoute";
 import "./App.css";
 
-// Lazy-loaded pages
 const Dashboard = lazy(() => import("./components/pages/Dashboard"));
 const NewReport = lazy(() => import("./components/pages/NewReport"));
 const Reports = lazy(() => import("./components/pages/Reports"));
