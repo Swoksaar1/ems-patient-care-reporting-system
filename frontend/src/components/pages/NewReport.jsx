@@ -11,7 +11,22 @@ const SKIN_COLOR = ["normal", "pale", "flushed", "jaundiced", "cyanotic"];
 const PUPILS = ["normal", "unreactive", "dilated", "constricted"];
 const CAP_REFILL = ["normal", "delayed", "absent"];
 
+const PULSE_STATUS = [
+  { label: "Regular (Wide)", value: "regular_wide" },
+  { label: "Irregular (Absent)", value: "irregular_absent" },
+];
+
+const CASE_TYPES = [
+  { label: "Medical", value: "medical" },
+  { label: "Trauma", value: "trauma" },
+  { label: "Interfacility", value: "interfacility" },
+  { label: "Hostran", value: "hostran" },
+  { label: "Standby Medics", value: "standby_medics" },
+  { label: "Back to Base", value: "back_to_base" },
+];
+
 const LOC_OPTIONS = [
+  { label: "N/A", value: "na" },
   { label: "Awake", value: "awake" },
   { label: "Verbal", value: "verbal" },
   { label: "Pain", value: "pain" },
@@ -93,6 +108,7 @@ function NewReportSkeleton() {
   return (
     <div className="nr-layout">
       <Sidebar />
+
       <div className="nr-main">
         <div className="nr-page">
           <div className="nr-head">
@@ -119,10 +135,12 @@ function NewReportSkeleton() {
                     <Skeleton className="skel-line skel-xs" style={{ width: 110, marginBottom: 10 }} />
                     <Skeleton className="skel-input" />
                   </div>
+
                   <div className="nr-field">
                     <Skeleton className="skel-line skel-xs" style={{ width: 90, marginBottom: 10 }} />
                     <Skeleton className="skel-input" />
                   </div>
+
                   <div className="nr-field">
                     <Skeleton className="skel-line skel-xs" style={{ width: 130, marginBottom: 10 }} />
                     <Skeleton className="skel-input" />
@@ -137,6 +155,7 @@ function NewReportSkeleton() {
                     <Skeleton className="skel-line skel-xs" style={{ width: 80, marginBottom: 10 }} />
                     <Skeleton className="skel-input" />
                   </div>
+
                   <div className="nr-field">
                     <Skeleton className="skel-line skel-xs" style={{ width: 140, marginBottom: 10 }} />
                     <Skeleton className="skel-input" />
@@ -165,6 +184,35 @@ function toApiDateTime(val) {
 
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) return null;
+
+  return d.toISOString();
+}
+
+function normalizeMilitaryTimeInput(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 4);
+}
+
+function isValidMilitaryTime(value) {
+  if (!value) return true;
+  return /^(?:[01]\d|2[0-3])[0-5]\d$/.test(value);
+}
+
+function militaryToApiDateTime(timeValue, dateValue) {
+  if (!timeValue || timeValue === NA) return null;
+
+  const clean = normalizeMilitaryTimeInput(timeValue);
+
+  if (!isValidMilitaryTime(clean)) return null;
+
+  const hh = clean.slice(0, 2);
+  const mm = clean.slice(2, 4);
+
+  const baseDate = dateValue || new Date().toISOString().slice(0, 10);
+  const dateTimeValue = `${baseDate}T${hh}:${mm}:00`;
+
+  const d = new Date(dateTimeValue);
+  if (Number.isNaN(d.getTime())) return null;
+
   return d.toISOString();
 }
 
@@ -177,6 +225,7 @@ async function readResponseBody(res) {
   }
 
   const text = await res.text().catch(() => "");
+
   try {
     const data = JSON.parse(text);
     return { kind: "json", data };
@@ -196,6 +245,7 @@ function extractErrorMessage(body) {
 
   if (typeof body === "object") {
     const firstKey = Object.keys(body)[0];
+
     if (firstKey) {
       const v = body[firstKey];
 
@@ -205,12 +255,17 @@ function extractErrorMessage(body) {
 
       if (v && typeof v === "object" && !Array.isArray(v)) {
         const nestedKey = Object.keys(v)[0];
+
         if (nestedKey) {
           const nestedVal = v[nestedKey];
+
           if (Array.isArray(nestedVal) && nestedVal[0]) {
             return `${firstKey}: ${nestedKey} - ${nestedVal[0]}`;
           }
-          return `${firstKey}: ${nestedKey} - ${typeof nestedVal === "string" ? nestedVal : JSON.stringify(nestedVal)}`;
+
+          return `${firstKey}: ${nestedKey} - ${
+            typeof nestedVal === "string" ? nestedVal : JSON.stringify(nestedVal)
+          }`;
         }
       }
 
@@ -224,7 +279,10 @@ function extractErrorMessage(body) {
 async function saveReportMultipart({ payload, attachment }) {
   const form = new FormData();
   form.append("payload", JSON.stringify(payload));
-  if (attachment) form.append("attachment", attachment);
+
+  if (attachment) {
+    form.append("attachment", attachment);
+  }
 
   const res = await fetchWithAuth(
     `${API_BASE}/api/reports/`,
@@ -281,21 +339,21 @@ function NewReport() {
   const [generatedCaseNo, setGeneratedCaseNo] = useState("");
 
   const [patient, setPatient] = useState({
-    first_name: "",
-    middle_name: "",
-    last_name: "",
+    full_name: "",
     address: "",
-    sex: "male",
+    age: "",
+    sex: NA,
+    case_type: "medical",
     chief_complaint: "",
     assessment: "",
   });
 
   const [incident, setIncident] = useState({
     ambulance_body_no: "",
-    call_no: "",
+    case_no: "",
     patient_location: "",
     transported_to: "",
-    level_of_consciousness: "awake",
+    level_of_consciousness: NA,
     doi: "",
     toi: "",
     poi: "",
@@ -309,42 +367,47 @@ function NewReport() {
     intervention_notes: "",
   });
 
+  const [vitalsEnabled, setVitalsEnabled] = useState(false);
+
   const [vitals, setVitals] = useState([
     {
       time: "",
       bp: "",
       pulse_rate: "",
+      pulse_status: NA,
       resp_rate: "",
-      resp_quality: "normal",
+      resp_quality: NA,
       temperature_value: "",
-      temperature_state: "normal",
+      temperature_state: NA,
       spo2: "",
-      skin_color: "normal",
-      pupils: "normal",
-      cap_refill: "normal",
-      location: "",
+      skin_color: NA,
+      pupils: NA,
+      cap_refill: NA,
     },
   ]);
 
   const [gcsEnabled, setGcsEnabled] = useState(false);
+
   const [gcs, setGcs] = useState({
-    eye_score: "spontaneously",
-    verbal_score: "oriented",
-    motor_score: "obeys",
+    eye_score: NA,
+    verbal_score: NA,
+    motor_score: NA,
   });
 
   const [apgarEnabled, setApgarEnabled] = useState(false);
+
   const [apgar, setApgar] = useState({
-    appearance: "pink",
-    pulse: "100_140",
-    grimace: "cry",
-    activity: "well_flexed",
-    respiration: "strong_cry",
+    appearance: NA,
+    pulse: NA,
+    grimace: NA,
+    activity: NA,
+    respiration: NA,
   });
 
   const [nonTransportEnabled, setNonTransportEnabled] = useState(false);
+
   const [nonTransport, setNonTransport] = useState({
-    reason: "cancelled_before_arrival",
+    reason: NA,
   });
 
   const [belongings, setBelongings] = useState({
@@ -368,6 +431,8 @@ function NewReport() {
   const [attachment, setAttachment] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
 
+  const isRelaxedCase = ["hostran", "standby_medics", "back_to_base"].includes(patient.case_type);
+
   const onPickAttachment = (file) => {
     setAttachment(file || null);
 
@@ -386,7 +451,9 @@ function NewReport() {
 
   useEffect(() => {
     return () => {
-      if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+      if (attachmentPreview) {
+        URL.revokeObjectURL(attachmentPreview);
+      }
     };
   }, [attachmentPreview]);
 
@@ -413,8 +480,31 @@ function NewReport() {
     );
   }, [apgar.appearance, apgar.pulse, apgar.grimace, apgar.activity, apgar.respiration]);
 
-  const updatePatient = (e) => setPatient({ ...patient, [e.target.name]: e.target.value });
+  const updatePatient = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "age") {
+      setPatient((prev) => ({
+        ...prev,
+        age: String(value || "").replace(/\D/g, "").slice(0, 3),
+      }));
+      return;
+    }
+
+    setPatient((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const updateIncident = (e) => setIncident({ ...incident, [e.target.name]: e.target.value });
+
+  const updateIncidentMilitaryTime = (name, value) => {
+    setIncident((prev) => ({
+      ...prev,
+      [name]: normalizeMilitaryTimeInput(value),
+    }));
+  };
 
   const updateVital = (idx, key, value) => {
     setVitals((prev) => prev.map((v, i) => (i === idx ? { ...v, [key]: value } : v)));
@@ -427,15 +517,15 @@ function NewReport() {
         time: "",
         bp: "",
         pulse_rate: "",
+        pulse_status: NA,
         resp_rate: "",
-        resp_quality: "normal",
+        resp_quality: NA,
         temperature_value: "",
-        temperature_state: "normal",
+        temperature_state: NA,
         spo2: "",
-        skin_color: "normal",
-        pupils: "normal",
-        cap_refill: "normal",
-        location: "",
+        skin_color: NA,
+        pupils: NA,
+        cap_refill: NA,
       },
     ]);
   };
@@ -446,21 +536,21 @@ function NewReport() {
 
   const resetForm = () => {
     setPatient({
-      first_name: "",
-      middle_name: "",
-      last_name: "",
+      full_name: "",
       address: "",
-      sex: "male",
+      age: "",
+      sex: NA,
+      case_type: "medical",
       chief_complaint: "",
       assessment: "",
     });
 
     setIncident({
       ambulance_body_no: "",
-      call_no: "",
+      case_no: "",
       patient_location: "",
       transported_to: "",
-      level_of_consciousness: "awake",
+      level_of_consciousness: NA,
       doi: "",
       toi: "",
       poi: "",
@@ -474,42 +564,47 @@ function NewReport() {
       intervention_notes: "",
     });
 
+    setVitalsEnabled(false);
+
     setVitals([
       {
         time: "",
         bp: "",
         pulse_rate: "",
+        pulse_status: NA,
         resp_rate: "",
-        resp_quality: "normal",
+        resp_quality: NA,
         temperature_value: "",
-        temperature_state: "normal",
+        temperature_state: NA,
         spo2: "",
-        skin_color: "normal",
-        pupils: "normal",
-        cap_refill: "normal",
-        location: "",
+        skin_color: NA,
+        pupils: NA,
+        cap_refill: NA,
       },
     ]);
 
     setGcsEnabled(false);
+
     setGcs({
-      eye_score: "spontaneously",
-      verbal_score: "oriented",
-      motor_score: "obeys",
+      eye_score: NA,
+      verbal_score: NA,
+      motor_score: NA,
     });
 
     setApgarEnabled(false);
+
     setApgar({
-      appearance: "pink",
-      pulse: "100_140",
-      grimace: "cry",
-      activity: "well_flexed",
-      respiration: "strong_cry",
+      appearance: NA,
+      pulse: NA,
+      grimace: NA,
+      activity: NA,
+      respiration: NA,
     });
 
     setNonTransportEnabled(false);
+
     setNonTransport({
-      reason: "cancelled_before_arrival",
+      reason: NA,
     });
 
     setBelongings({
@@ -534,28 +629,52 @@ function NewReport() {
     setAttachmentPreview(null);
   };
 
+  const validateIncidentMilitaryTimes = () => {
+    const fields = [
+      { key: "call_received_time", label: "Call Received" },
+      { key: "responded_time", label: "Responded" },
+      { key: "arrived_scene_time", label: "Arrived Scene" },
+      { key: "left_scene_time", label: "Left Scene" },
+      { key: "arrived_hospital_time", label: "Arrived Hospital" },
+      { key: "back_in_service_time", label: "Back In Service" },
+    ];
+
+    for (const field of fields) {
+      const value = incident[field.key];
+
+      if (value && !isValidMilitaryTime(value)) {
+        showToast(
+          "error",
+          `${field.label} must be valid military time. Example: 0000, 0830, 1430, or 2359.`
+        );
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (saving) return;
 
-    if (!patient.first_name.trim()) {
-      showToast("error", "Please enter the first name.");
+    if (!isRelaxedCase && !patient.full_name.trim()) {
+      showToast("error", "Please enter the full name.");
       return;
     }
 
-    if (!patient.chief_complaint.trim()) {
+    if (!isRelaxedCase && !patient.chief_complaint.trim()) {
       showToast("error", "Please enter the chief complaint.");
       return;
     }
 
-    if (!incident.ambulance_body_no.trim()) {
+    if (!isRelaxedCase && !incident.ambulance_body_no.trim()) {
       showToast("error", "Please enter the ambulance body number.");
       return;
     }
 
-    if (!incident.call_no.trim()) {
-      showToast("error", "Please enter the call number.");
+    if (!validateIncidentMilitaryTimes()) {
       return;
     }
 
@@ -564,49 +683,54 @@ function NewReport() {
     const incidentForApi = {
       ...incident,
       ambulance_body_no: incident.ambulance_body_no?.trim() || "",
-      call_no: incident.call_no?.trim() || "",
+      case_no: incident.case_no?.trim() || "",
       patient_location: incident.patient_location?.trim() || "",
       transported_to: incident.transported_to?.trim() || "",
+      level_of_consciousness:
+        incident.level_of_consciousness === NA ? "" : incident.level_of_consciousness || "",
       poi: incident.poi?.trim() || "",
       moi: incident.moi?.trim() || "",
       intervention_notes: incident.intervention_notes?.trim() || "",
-      call_received_time: toApiDateTime(incident.call_received_time),
-      responded_time: toApiDateTime(incident.responded_time),
-      arrived_scene_time: toApiDateTime(incident.arrived_scene_time),
-      left_scene_time: toApiDateTime(incident.left_scene_time),
-      arrived_hospital_time: toApiDateTime(incident.arrived_hospital_time),
-      back_in_service_time: toApiDateTime(incident.back_in_service_time),
+      call_received_time: militaryToApiDateTime(incident.call_received_time, incident.doi),
+      responded_time: militaryToApiDateTime(incident.responded_time, incident.doi),
+      arrived_scene_time: militaryToApiDateTime(incident.arrived_scene_time, incident.doi),
+      left_scene_time: militaryToApiDateTime(incident.left_scene_time, incident.doi),
+      arrived_hospital_time: militaryToApiDateTime(incident.arrived_hospital_time, incident.doi),
+      back_in_service_time: militaryToApiDateTime(incident.back_in_service_time, incident.doi),
     };
 
-    const vitalsForApi = vitals.map((v) => ({
-      ...v,
-      time: toApiDateTime(v.time),
-      bp: v.bp?.trim() || "",
-      pulse_rate: v.pulse_rate?.trim() || "",
-      resp_rate: v.resp_rate?.trim() || "",
-      resp_quality: v.resp_quality === NA ? "" : (v.resp_quality || "normal"),
-      temperature_value: v.temperature_value?.trim() || "",
-      temperature_state: v.temperature_state === NA ? "" : (v.temperature_state || "normal"),
-      spo2: v.spo2?.trim() || "",
-      skin_color: v.skin_color === NA ? "" : (v.skin_color || "normal"),
-      pupils: v.pupils === NA ? "" : (v.pupils || "normal"),
-      cap_refill: v.cap_refill === NA ? "" : (v.cap_refill || "normal"),
-      location: v.location?.trim() || "",
-    }));
+    const vitalsForApi = vitalsEnabled
+      ? vitals.map((v) => ({
+          time: toApiDateTime(v.time),
+          bp: v.bp?.trim() || "",
+          pulse_rate: v.pulse_rate?.trim() || "",
+          pulse_status: v.pulse_status === NA ? "" : v.pulse_status || "",
+          resp_rate: v.resp_rate?.trim() || "",
+          resp_quality: v.resp_quality === NA ? "" : v.resp_quality || "normal",
+          temperature_value: v.temperature_value?.trim() || "",
+          temperature_state: v.temperature_state === NA ? "" : v.temperature_state || "normal",
+          spo2: v.spo2?.trim() || "",
+          skin_color: v.skin_color === NA ? "" : v.skin_color || "normal",
+          pupils: v.pupils === NA ? "" : v.pupils || "normal",
+          cap_refill: v.cap_refill === NA ? "" : v.cap_refill || "normal",
+        }))
+      : [];
 
     const payload = {
+      case_type: patient.case_type || "medical",
+
       patient: {
-        first_name: patient.first_name?.trim() || "",
-        middle_name: patient.middle_name?.trim() || "",
-        last_name: patient.last_name?.trim() || "",
+        full_name: patient.full_name?.trim() || "",
         address: patient.address?.trim() || "",
-        sex: patient.sex || "male",
+        age: patient.age?.trim() || "",
+        sex: patient.sex || NA,
+        case_type: patient.case_type || "medical",
         chief_complaint: patient.chief_complaint?.trim() || "",
         assessment: patient.assessment?.trim() || "",
       },
 
       ambulance_body_no: incidentForApi.ambulance_body_no,
-      call_no: incidentForApi.call_no,
+      case_no: incidentForApi.case_no,
       patient_location: incidentForApi.patient_location,
       transported_to: incidentForApi.transported_to,
       doi: incidentForApi.doi || null,
@@ -622,45 +746,56 @@ function NewReport() {
       intervention_notes: incidentForApi.intervention_notes,
 
       incident: {
-        level_of_consciousness: incidentForApi.level_of_consciousness || "awake",
+        level_of_consciousness: incidentForApi.level_of_consciousness || NA,
       },
 
+      enable_vitals: vitalsEnabled,
+      enable_gcs: gcsEnabled,
+      enable_apgar: apgarEnabled,
+      enable_non_transport: nonTransportEnabled,
+
       vitals: vitalsForApi,
+
       gcs: gcsEnabled
         ? {
-            eye_score: gcs.eye_score === NA ? "" : (gcs.eye_score || ""),
-            verbal_score: gcs.verbal_score === NA ? "" : (gcs.verbal_score || ""),
-            motor_score: gcs.motor_score === NA ? "" : (gcs.motor_score || ""),
+            eye_score: gcs.eye_score === NA ? "" : gcs.eye_score || "",
+            verbal_score: gcs.verbal_score === NA ? "" : gcs.verbal_score || "",
+            motor_score: gcs.motor_score === NA ? "" : gcs.motor_score || "",
             total_score: gcsTotal,
           }
         : null,
+
       apgar: apgarEnabled
         ? {
-            appearance: apgar.appearance === NA ? "" : (apgar.appearance || ""),
-            pulse: apgar.pulse === NA ? "" : (apgar.pulse || ""),
-            grimace: apgar.grimace === NA ? "" : (apgar.grimace || ""),
-            activity: apgar.activity === NA ? "" : (apgar.activity || ""),
-            respiration: apgar.respiration === NA ? "" : (apgar.respiration || ""),
+            appearance: apgar.appearance === NA ? "" : apgar.appearance || "",
+            pulse: apgar.pulse === NA ? "" : apgar.pulse || "",
+            grimace: apgar.grimace === NA ? "" : apgar.grimace || "",
+            activity: apgar.activity === NA ? "" : apgar.activity || "",
+            respiration: apgar.respiration === NA ? "" : apgar.respiration || "",
             total_score: apgarTotal,
           }
         : null,
+
       non_transport: nonTransportEnabled
         ? {
-            reason: nonTransport.reason === NA ? "" : (nonTransport.reason || ""),
+            reason: nonTransport.reason === NA ? "" : nonTransport.reason || "",
           }
         : null,
+
       belongings: {
         items: belongings.items?.trim() || "",
         turned_over_to: belongings.turned_over_to?.trim() || "",
         received_by: belongings.received_by?.trim() || "",
         notes: belongings.notes?.trim() || "",
       },
+
       ems_crew: {
         ems_in_charge: emsCrew.ems_in_charge?.trim() || "",
         ems_assistant_1: emsCrew.ems_assistant_1?.trim() || "",
         ems_assistant_2: emsCrew.ems_assistant_2?.trim() || "",
         ems_operator: emsCrew.ems_operator?.trim() || "",
       },
+
       receiving_physician_nod: {
         physician_nod: receiving.physician_nod?.trim() || "",
       },
@@ -676,9 +811,7 @@ function NewReport() {
 
       showToast(
         "success",
-        savedCaseNo
-          ? `Saved successfully! Case No.: ${savedCaseNo}`
-          : "Saved successfully!"
+        savedCaseNo ? `Saved successfully! Case No.: ${savedCaseNo}` : "Saved successfully!"
       );
 
       resetForm();
@@ -716,10 +849,7 @@ function NewReport() {
           </div>
 
           {generatedCaseNo && (
-            <div
-              className="nr-card"
-              style={{ marginBottom: 18, padding: "16px 18px" }}
-            >
+            <div className="nr-card" style={{ marginBottom: 18, padding: "16px 18px" }}>
               <div className="nr-section-head" style={{ marginBottom: 0 }}>
                 <div>
                   <h3>Last Saved Case No.</h3>
@@ -741,33 +871,13 @@ function NewReport() {
               </div>
 
               <div className="nr-grid">
-                <div className="nr-field">
-                  <label>First Name</label>
+                <div className="nr-field nr-full">
+                  <label>Full Name</label>
                   <input
-                    name="first_name"
-                    value={patient.first_name}
+                    name="full_name"
+                    value={patient.full_name}
                     onChange={updatePatient}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Middle Name</label>
-                  <input
-                    name="middle_name"
-                    value={patient.middle_name}
-                    onChange={updatePatient}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Last Name</label>
-                  <input
-                    name="last_name"
-                    value={patient.last_name}
-                    onChange={updatePatient}
-                    placeholder="Leave blank if unknown"
+                    placeholder="Enter full name"
                     disabled={saving}
                   />
                 </div>
@@ -778,7 +888,21 @@ function NewReport() {
                     name="address"
                     value={patient.address}
                     onChange={updatePatient}
-                    placeholder="Barangay / City"
+                    placeholder="Barangay"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div className="nr-field">
+                  <label>Age</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="age"
+                    value={patient.age}
+                    onChange={updatePatient}
+                    placeholder="Enter age"
+                    maxLength={3}
                     disabled={saving}
                   />
                 </div>
@@ -786,8 +910,25 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Sex</label>
                   <select name="sex" value={patient.sex} onChange={updatePatient} disabled={saving}>
+                    <option value={NA}>N/A</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
+                  </select>
+                </div>
+
+                <div className="nr-field">
+                  <label>Case Type</label>
+                  <select
+                    name="case_type"
+                    value={patient.case_type}
+                    onChange={updatePatient}
+                    disabled={saving}
+                  >
+                    {CASE_TYPES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -831,6 +972,7 @@ function NewReport() {
                     onChange={(e) => onPickAttachment(e.target.files?.[0])}
                     disabled={saving}
                   />
+
                   {attachmentPreview && (
                     <div style={{ marginTop: 10 }}>
                       <img
@@ -860,17 +1002,7 @@ function NewReport() {
                     name="ambulance_body_no"
                     value={incident.ambulance_body_no}
                     onChange={updateIncident}
-                    placeholder="e.g. EMS-01"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Call No.</label>
-                  <input
-                    name="call_no"
-                    value={incident.call_no}
-                    onChange={updateIncident}
+                    placeholder="e.g. Ambu 1..."
                     disabled={saving}
                   />
                 </div>
@@ -878,9 +1010,11 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Case No.</label>
                   <input
-                    value={generatedCaseNo || "Auto-generated after save"}
-                    readOnly
-                    disabled
+                    name="case_no"
+                    value={incident.case_no}
+                    onChange={updateIncident}
+                    placeholder="YY-0000"
+                    disabled={saving}
                   />
                 </div>
 
@@ -967,10 +1101,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Call Received</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="call_received_time"
                     value={incident.call_received_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("call_received_time", e.target.value)
+                    }
+                    placeholder="0000"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -978,10 +1117,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Responded</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="responded_time"
                     value={incident.responded_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("responded_time", e.target.value)
+                    }
+                    placeholder="0100"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -989,10 +1133,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Arrived Scene</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="arrived_scene_time"
                     value={incident.arrived_scene_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("arrived_scene_time", e.target.value)
+                    }
+                    placeholder="0200"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -1000,10 +1149,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Left Scene</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="left_scene_time"
                     value={incident.left_scene_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("left_scene_time", e.target.value)
+                    }
+                    placeholder="0300"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -1011,10 +1165,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Arrived Hospital</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="arrived_hospital_time"
                     value={incident.arrived_hospital_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("arrived_hospital_time", e.target.value)
+                    }
+                    placeholder="0400"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -1022,10 +1181,15 @@ function NewReport() {
                 <div className="nr-field">
                   <label>Back In Service</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
                     name="back_in_service_time"
                     value={incident.back_in_service_time}
-                    onChange={updateIncident}
+                    onChange={(e) =>
+                      updateIncidentMilitaryTime("back_in_service_time", e.target.value)
+                    }
+                    placeholder="0500"
+                    maxLength={4}
                     disabled={saving}
                   />
                 </div>
@@ -1050,189 +1214,213 @@ function NewReport() {
                   <h3>Vitals</h3>
                   <p>Record multiple vital entries (scene, en route, ER).</p>
                 </div>
-                <span className="nr-tag">Vitals</span>
+
+                <label className="nr-toggle">
+                  <input
+                    type="checkbox"
+                    checked={vitalsEnabled}
+                    onChange={(e) => setVitalsEnabled(e.target.checked)}
+                    disabled={saving}
+                  />
+                  <span>Enable Vitals</span>
+                </label>
               </div>
 
-              {vitals.map((v, idx) => (
-                <div className="nr-vital" key={idx}>
-                  <div className="nr-vital-head">
-                    <div className="nr-vital-title">Vitals Entry #{idx + 1}</div>
-                    <div className="nr-vital-actions">
-                      <button
-                        type="button"
-                        className="nr-btn nr-btn-soft"
-                        onClick={() => removeVitalRow(idx)}
-                        disabled={vitals.length <= 1 || saving}
-                      >
-                        Remove
-                      </button>
+              {vitalsEnabled && (
+                <>
+                  {vitals.map((v, idx) => (
+                    <div className="nr-vital" key={idx}>
+                      <div className="nr-vital-head">
+                        <div className="nr-vital-title">Vitals Entry #{idx + 1}</div>
+
+                        <div className="nr-vital-actions">
+                          <button
+                            type="button"
+                            className="nr-btn nr-btn-soft"
+                            onClick={() => removeVitalRow(idx)}
+                            disabled={vitals.length <= 1 || saving}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="nr-grid">
+                        <div className="nr-field">
+                          <label>Time</label>
+                          <input
+                            type="datetime-local"
+                            value={v.time}
+                            onChange={(e) => updateVital(idx, "time", e.target.value)}
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>BP</label>
+                          <input
+                            value={v.bp}
+                            onChange={(e) => updateVital(idx, "bp", e.target.value)}
+                            placeholder="120/80"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Pulse</label>
+                          <input
+                            value={v.pulse_rate}
+                            onChange={(e) => updateVital(idx, "pulse_rate", e.target.value)}
+                            placeholder="bpm"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Pulse Status</label>
+                          <select
+                            value={v.pulse_status}
+                            onChange={(e) => updateVital(idx, "pulse_status", e.target.value)}
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {PULSE_STATUS.map((x) => (
+                              <option key={x.value} value={x.value}>
+                                {x.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Respiration</label>
+                          <input
+                            value={v.resp_rate}
+                            onChange={(e) => updateVital(idx, "resp_rate", e.target.value)}
+                            placeholder="rpm"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Resp. Quality</label>
+                          <select
+                            value={v.resp_quality}
+                            onChange={(e) => updateVital(idx, "resp_quality", e.target.value)}
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {RESP_QUALITY.map((x) => (
+                              <option key={x} value={x}>
+                                {x}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Temperature</label>
+                          <input
+                            value={v.temperature_value}
+                            onChange={(e) =>
+                              updateVital(idx, "temperature_value", e.target.value)
+                            }
+                            placeholder="°C"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Temp State</label>
+                          <select
+                            value={v.temperature_state}
+                            onChange={(e) =>
+                              updateVital(idx, "temperature_state", e.target.value)
+                            }
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {TEMP_STATE.map((x) => (
+                              <option key={x} value={x}>
+                                {x}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="nr-field">
+                          <label>SpO2</label>
+                          <input
+                            value={v.spo2}
+                            onChange={(e) => updateVital(idx, "spo2", e.target.value)}
+                            placeholder="%"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Skin Color</label>
+                          <select
+                            value={v.skin_color}
+                            onChange={(e) => updateVital(idx, "skin_color", e.target.value)}
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {SKIN_COLOR.map((x) => (
+                              <option key={x} value={x}>
+                                {x}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Pupils</label>
+                          <select
+                            value={v.pupils}
+                            onChange={(e) => updateVital(idx, "pupils", e.target.value)}
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {PUPILS.map((x) => (
+                              <option key={x} value={x}>
+                                {x}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="nr-field">
+                          <label>Cap Refill</label>
+                          <select
+                            value={v.cap_refill}
+                            onChange={(e) => updateVital(idx, "cap_refill", e.target.value)}
+                            disabled={saving}
+                          >
+                            <option value={NA}>N/A</option>
+                            {CAP_REFILL.map((x) => (
+                              <option key={x} value={x}>
+                                {x}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
+                  ))}
+
+                  <div className="nr-row-end">
+                    <button
+                      type="button"
+                      className="nr-btn nr-btn-primary"
+                      onClick={addVitalRow}
+                      disabled={saving}
+                    >
+                      + Add Vitals Entry
+                    </button>
                   </div>
-
-                  <div className="nr-grid">
-                    <div className="nr-field">
-                      <label>Time</label>
-                      <input
-                        type="datetime-local"
-                        value={v.time}
-                        onChange={(e) => updateVital(idx, "time", e.target.value)}
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>BP</label>
-                      <input
-                        value={v.bp}
-                        onChange={(e) => updateVital(idx, "bp", e.target.value)}
-                        placeholder="120/80"
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Pulse</label>
-                      <input
-                        value={v.pulse_rate}
-                        onChange={(e) => updateVital(idx, "pulse_rate", e.target.value)}
-                        placeholder="bpm"
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Respiration</label>
-                      <input
-                        value={v.resp_rate}
-                        onChange={(e) => updateVital(idx, "resp_rate", e.target.value)}
-                        placeholder="rpm"
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Resp. Quality</label>
-                      <select
-                        value={v.resp_quality}
-                        onChange={(e) => updateVital(idx, "resp_quality", e.target.value)}
-                        disabled={saving}
-                      >
-                        <option value={NA}>N/A</option>
-                        {RESP_QUALITY.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Temperature</label>
-                      <input
-                        value={v.temperature_value}
-                        onChange={(e) => updateVital(idx, "temperature_value", e.target.value)}
-                        placeholder="°C"
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Temp State</label>
-                      <select
-                        value={v.temperature_state}
-                        onChange={(e) => updateVital(idx, "temperature_state", e.target.value)}
-                        disabled={saving}
-                      >
-                        <option value={NA}>N/A</option>
-                        {TEMP_STATE.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="nr-field">
-                      <label>SpO2</label>
-                      <input
-                        value={v.spo2}
-                        onChange={(e) => updateVital(idx, "spo2", e.target.value)}
-                        placeholder="%"
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Skin Color</label>
-                      <select
-                        value={v.skin_color}
-                        onChange={(e) => updateVital(idx, "skin_color", e.target.value)}
-                        disabled={saving}
-                      >
-                        <option value={NA}>N/A</option>
-                        {SKIN_COLOR.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Pupils</label>
-                      <select
-                        value={v.pupils}
-                        onChange={(e) => updateVital(idx, "pupils", e.target.value)}
-                        disabled={saving}
-                      >
-                        <option value={NA}>N/A</option>
-                        {PUPILS.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Cap Refill</label>
-                      <select
-                        value={v.cap_refill}
-                        onChange={(e) => updateVital(idx, "cap_refill", e.target.value)}
-                        disabled={saving}
-                      >
-                        <option value={NA}>N/A</option>
-                        {CAP_REFILL.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="nr-field">
-                      <label>Location</label>
-                      <input
-                        value={v.location}
-                        onChange={(e) => updateVital(idx, "location", e.target.value)}
-                        placeholder="Scene / En route / ER"
-                        disabled={saving}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <div className="nr-row-end">
-                <button
-                  type="button"
-                  className="nr-btn nr-btn-primary"
-                  onClick={addVitalRow}
-                  disabled={saving}
-                >
-                  + Add Vitals Entry
-                </button>
-              </div>
+                </>
+              )}
             </div>
 
             <div className="nr-section">
@@ -1483,7 +1671,9 @@ function NewReport() {
                   <label>Turned Over To</label>
                   <input
                     value={belongings.turned_over_to}
-                    onChange={(e) => setBelongings({ ...belongings, turned_over_to: e.target.value })}
+                    onChange={(e) =>
+                      setBelongings({ ...belongings, turned_over_to: e.target.value })
+                    }
                     placeholder="Hospital staff / Relative"
                     disabled={saving}
                   />

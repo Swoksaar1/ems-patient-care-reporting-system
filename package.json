@@ -1,12 +1,19 @@
 {
   "name": "ems-patient-care-reporting-system",
-  "version": "1.0.0",
+  "productName": "EMS Patient Care Reporting System",
+  "version": "1.0.1",
   "description": "EMS Patient Care Reporting System desktop app built with Electron, React, and Django",
-  "author": "Rubin",
   "main": "electron/main.js",
+  "author": "Rubin",
+  "license": "MIT",
   "scripts": {
+    "frontend:start": "npm start --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend",
     "electron": "electron .",
-    "dist-win": "electron-builder --win"
+    "electron:start": "electron .",
+    "backend:build": ".\\venv\\Scripts\\python.exe -m PyInstaller ems_backend.spec --noconfirm --clean --distpath dist --workpath build/backend",
+    "dist": "npm run frontend:build && npm run backend:build && electron-builder",
+    "dist:win": "npm run frontend:build && npm run backend:build && electron-builder --win"
   },
   "devDependencies": {
     "electron": "^36.0.0",
@@ -19,8 +26,8 @@
       "output": "release"
     },
     "files": [
-      "electron/**/*",
       "frontend/build/**/*",
+      "electron/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -29,47 +36,35 @@
         "to": "backend/ems_backend.exe"
       },
       {
-        "from": "ems_system",
-        "to": "ems_system",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "reports",
-        "to": "reports",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "manage.py",
-        "to": "manage.py"
-      },
-      {
         "from": "db.sqlite3",
-        "to": "db.sqlite3"
+        "to": "seed/db.sqlite3"
       },
       {
         "from": "media",
-        "to": "media",
+        "to": "seed/media",
         "filter": [
           "**/*"
         ]
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "electron/icon.ico"
+      "target": [
+        "nsis"
+      ],
+      "icon": "electron/icon.ico",
+      "executableName": "EMS Patient Care Reporting System",
+      "artifactName": "${productName} Setup ${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "electron/icon.ico",
       "uninstallerIcon": "electron/icon.ico",
       "installerHeaderIcon": "electron/icon.ico",
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "shortcutName": "EMS Patient Care Reporting System"
     }
   }
 }

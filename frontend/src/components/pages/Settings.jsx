@@ -42,7 +42,7 @@ function Settings() {
       const raw = localStorage.getItem("ems_settings");
       if (raw) {
         try {
-          setSettings(JSON.parse(raw));
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
         } catch {
           // ignore corrupted data
         }
@@ -184,6 +184,7 @@ function Settings() {
         `${API_BASE}/api/auth/account/`,
         {
           method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         },
         API_BASE
@@ -255,7 +256,6 @@ function Settings() {
 
       <div className="st-main">
         <div className="st-page">
-          {/* HEADER */}
           <div className="st-head">
             <div>
               <div className="st-crumbs">Settings</div>
@@ -292,14 +292,13 @@ function Settings() {
                     disabled={saving}
                     type="button"
                   >
-                    {saving ? "Saving…" : "Save Changes"}
+                    {saving ? "Saving..." : "Save Changes"}
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* ALERTS */}
           {!loading && (error || savedMsg) && (
             <div className={`st-alert ${error ? "danger" : "ok"}`}>
               <div className="st-alert-title">{error ? "Action failed" : "Success"}</div>
@@ -307,9 +306,7 @@ function Settings() {
             </div>
           )}
 
-          {/* CONTENT */}
           <div className="st-grid">
-            {/* ORGANIZATION PROFILE */}
             <section className="st-card">
               <div className="st-card-head">
                 <div>
@@ -397,14 +394,13 @@ function Settings() {
 
                   <div className="st-form-actions">
                     <button className="st-btn st-btn-primary" type="submit" disabled={saving}>
-                      {saving ? "Saving…" : "Save"}
+                      {saving ? "Saving..." : "Save"}
                     </button>
                   </div>
                 </form>
               )}
             </section>
 
-            {/* REPORT PREFERENCES */}
             <section className="st-card">
               <div className="st-card-head">
                 <div>
@@ -468,14 +464,13 @@ function Settings() {
                   </div>
 
                   <div className="st-note">
-                    Tip: Autosave uses your browser storage. Clearing browser data will remove saved
-                    drafts.
+                    Tip: Autosave uses your browser storage. Clearing browser data will remove
+                    saved drafts.
                   </div>
                 </div>
               )}
             </section>
 
-            {/* ACCOUNT & SECURITY */}
             <section className="st-card st-card-wide">
               <div className="st-card-head">
                 <div>
@@ -572,7 +567,7 @@ function Settings() {
                       onClick={saveAccount}
                       disabled={acctSaving}
                     >
-                      {acctSaving ? "Updating…" : "Update Account"}
+                      {acctSaving ? "Updating..." : "Update Account"}
                     </button>
                   </div>
 

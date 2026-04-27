@@ -1,113 +1,198 @@
 const { app, BrowserWindow, Menu, dialog } = require("electron");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const http = require("http");
 const fs = require("fs");
 
 let backendProcess = null;
+let isQuitting = false;
+
 const isDev = !app.isPackaged;
 
+const APP_TITLE = "EMS Patient Care Reporting System";
+const BACKEND_HOST = "127.0.0.1";
+const BACKEND_PORT = "8000";
+
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
 }
 
 function copyFileIfMissing(src, dest) {
-  if (!fs.existsSync(dest) && fs.existsSync(src)) {
-    fs.copyFileSync(src, dest);
-  }
+  if (!fs.existsSync(src)) return;
+  if (fs.existsSync(dest)) return;
+
+  ensureDir(path.dirname(dest));
+  fs.copyFileSync(src, dest);
 }
 
 function copyDirIfMissing(srcDir, destDir) {
   if (!fs.existsSync(srcDir)) return;
+
   ensureDir(destDir);
 
   const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+
   for (const entry of entries) {
     const src = path.join(srcDir, entry.name);
     const dest = path.join(destDir, entry.name);
 
     if (entry.isDirectory()) {
       copyDirIfMissing(src, dest);
-    } else if (!fs.existsSync(dest)) {
-      fs.copyFileSync(src, dest);
+    } else {
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+      }
     }
   }
 }
 
+function getProjectRoot() {
+  return path.join(__dirname, "..");
+}
+
+function getInstallDir() {
+  if (isDev) {
+    return getProjectRoot();
+  }
+
+  /*
+    Installed app folder:
+    C:\Users\YOUR_NAME\AppData\Local\Programs\EMS Patient Care Reporting System
+
+    This is where the LIVE db.sqlite3 will be saved.
+  */
+  return path.dirname(process.execPath);
+}
+
+function getLiveDbPath() {
+  return path.join(getInstallDir(), "db.sqlite3");
+}
+
+function getLiveMediaRoot() {
+  return path.join(getInstallDir(), "media");
+}
+
+function prepareLiveStorage() {
+  const liveDbPath = getLiveDbPath();
+  const liveMediaRoot = getLiveMediaRoot();
+
+  ensureDir(path.dirname(liveDbPath));
+  ensureDir(liveMediaRoot);
+
+  if (!isDev) {
+    /*
+      Seed files are read-only packaged copies.
+      They are copied only once if the live files do not exist yet.
+    */
+    const seedDbPath = path.join(process.resourcesPath, "seed", "db.sqlite3");
+    const seedMediaDir = path.join(process.resourcesPath, "seed", "media");
+
+    copyFileIfMissing(seedDbPath, liveDbPath);
+    copyDirIfMissing(seedMediaDir, liveMediaRoot);
+  }
+
+  return {
+    liveDbPath,
+    liveMediaRoot,
+  };
+}
+
+function getBackendExecutablePath() {
+  if (isDev) {
+    return path.join(getProjectRoot(), "dist", "ems_backend.exe");
+  }
+
+  return path.join(process.resourcesPath, "backend", "ems_backend.exe");
+}
+
+function getFrontendIndexPath() {
+  if (isDev) {
+    return path.join(getProjectRoot(), "frontend", "build", "index.html");
+  }
+
+  return path.join(process.resourcesPath, "app.asar", "frontend", "build", "index.html");
+}
+
+function getIconPath() {
+  if (isDev) {
+    return path.join(getProjectRoot(), "electron", "icon.ico");
+  }
+
+  return path.join(process.resourcesPath, "app.asar", "electron", "icon.ico");
+}
+
+function getPythonPath() {
+  const projectRoot = getProjectRoot();
+  const venvPython = path.join(projectRoot, "venv", "Scripts", "python.exe");
+
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
+
+  return "python";
+}
+
 function startBackend() {
-  const projectRoot = path.join(__dirname, "..");
+  const projectRoot = getProjectRoot();
+  const { liveDbPath, liveMediaRoot } = prepareLiveStorage();
 
   let command;
   let args = [];
   let cwd;
-  let backendEnv = { ...process.env };
+
+  const backendEnv = {
+    ...process.env,
+    DJANGO_DEBUG: isDev ? "True" : "False",
+    EMS_DB_PATH: liveDbPath,
+    EMS_MEDIA_ROOT: liveMediaRoot,
+    PYTHONUNBUFFERED: "1",
+  };
 
   if (isDev) {
-    // Development mode
-    command = path.join(projectRoot, "venv", "Scripts", "python.exe");
-    args = ["manage.py", "runserver", "127.0.0.1:8000", "--noreload"];
+    command = getPythonPath();
+    args = [
+      "manage.py",
+      "runserver",
+      `${BACKEND_HOST}:${BACKEND_PORT}`,
+      "--noreload",
+    ];
     cwd = projectRoot;
 
-    if (!fs.existsSync(command)) {
+    if (!fs.existsSync(command) && command !== "python") {
       dialog.showErrorBox(
         "Backend Error",
-        `Python not found:\n${command}\n\nMake sure your virtual environment exists (venv).`
+        `Python not found:\n${command}\n\nMake sure your virtual environment exists.`
       );
       return;
     }
-
-    // In dev, use project db/media
-    backendEnv.EMS_DB_PATH = path.join(projectRoot, "db.sqlite3");
-    backendEnv.EMS_MEDIA_ROOT = path.join(projectRoot, "media");
   } else {
-    // Packaged mode
-    command = path.join(process.resourcesPath, "backend", "ems_backend.exe");
+    command = getBackendExecutablePath();
+    args = [];
+    cwd = path.dirname(command);
 
     if (!fs.existsSync(command)) {
       dialog.showErrorBox(
         "Backend Error",
-        `Could not find backend executable:\n${command}\n\nPlease reinstall the app or rebuild the installer.`
+        `Could not find backend executable:\n${command}\n\nPlease rebuild the installer.`
       );
       return;
     }
-
-    // ✅ Use writable userData folder for runtime DB/media
-    const userDataPath = app.getPath("userData");
-    const runtimeDataDir = path.join(userDataPath, "runtime");
-    const runtimeMediaDir = path.join(runtimeDataDir, "media");
-    const runtimeDbPath = path.join(runtimeDataDir, "db.sqlite3");
-
-    ensureDir(runtimeDataDir);
-    ensureDir(runtimeMediaDir);
-
-    // Bundled seed files (read-only source)
-    const bundledDbPath = path.join(process.resourcesPath, "db.sqlite3");
-    const bundledMediaDir = path.join(process.resourcesPath, "media");
-
-    // Copy initial DB/media only if missing
-    copyFileIfMissing(bundledDbPath, runtimeDbPath);
-    copyDirIfMissing(bundledMediaDir, runtimeMediaDir);
-
-    // Run backend from resources (so bundled code/imports resolve)
-    cwd = process.resourcesPath;
-
-    // ✅ Pass writable paths to backend
-    backendEnv.EMS_DB_PATH = runtimeDbPath;
-    backendEnv.EMS_MEDIA_ROOT = runtimeMediaDir;
-
-    console.log("[Backend] resourcesPath:", process.resourcesPath);
-    console.log("[Backend] userDataPath:", userDataPath);
-    console.log("[Backend] runtimeDbPath:", runtimeDbPath);
-    console.log("[Backend] runtimeMediaDir:", runtimeMediaDir);
   }
 
   console.log("[Backend] Starting:", command, args.join(" "));
   console.log("[Backend] CWD:", cwd);
+  console.log("[Backend] LIVE DB:", liveDbPath);
+  console.log("[Backend] LIVE MEDIA:", liveMediaRoot);
+  console.log("[Backend] resourcesPath:", process.resourcesPath);
+  console.log("[Backend] installDir:", getInstallDir());
 
   backendProcess = spawn(command, args, {
     cwd,
     shell: false,
     windowsHide: true,
+    detached: false,
     env: backendEnv,
   });
 
@@ -134,7 +219,7 @@ function startBackend() {
   });
 }
 
-function waitForBackend(url, timeoutMs = 20000) {
+function waitForBackend(url, timeoutMs = 25000) {
   const start = Date.now();
 
   return new Promise((resolve, reject) => {
@@ -152,7 +237,9 @@ function waitForBackend(url, timeoutMs = 20000) {
         }
       });
 
-      req.setTimeout(3000, () => req.destroy());
+      req.setTimeout(3000, () => {
+        req.destroy();
+      });
     };
 
     tryConnect();
@@ -160,16 +247,18 @@ function waitForBackend(url, timeoutMs = 20000) {
 }
 
 function createWindow() {
-  const indexPath = path.join(__dirname, "..", "frontend", "build", "index.html");
-  const iconPath = path.join(__dirname, "icon.ico");
+  const indexPath = getFrontendIndexPath();
+  const iconPath = getIconPath();
 
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    icon: iconPath,
+    title: APP_TITLE,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     autoHideMenuBar: true,
+    backgroundColor: "#07111f",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -183,27 +272,90 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
 
-  win.loadFile(indexPath).catch((err) => {
-    console.error("[Electron] Failed to load UI file:", err);
-    dialog.showErrorBox(
-      "UI Load Error",
-      `Could not load frontend build.\n\nExpected file:\n${indexPath}\n\nMake sure you ran:\n1) cd frontend && npm run build\n2) npm run dist-win`
+  if (fs.existsSync(indexPath)) {
+    win.loadFile(indexPath).catch((err) => {
+      console.error("[Electron] Failed to load UI file:", err);
+      dialog.showErrorBox(
+        "UI Load Error",
+        `Could not load frontend build.\n\nExpected file:\n${indexPath}`
+      );
+    });
+  } else {
+    win.loadURL(
+      `data:text/html;charset=utf-8,
+      <html>
+        <body style="font-family: Arial; padding: 30px; background: #0f172a; color: white;">
+          <h2>Frontend build not found</h2>
+          <p>${indexPath}</p>
+          <p>Run: npm run dist:win</p>
+        </body>
+      </html>`
     );
-  });
+  }
 
   if (isDev) {
     win.webContents.openDevTools({ mode: "detach" });
   }
 }
 
+function forceKillBackendByName(callback) {
+  if (process.platform !== "win32") {
+    if (callback) callback();
+    return;
+  }
+
+  execFile(
+    "taskkill",
+    ["/IM", "ems_backend.exe", "/T", "/F"],
+    { windowsHide: true },
+    (error, stdout, stderr) => {
+      if (error) {
+        console.warn(
+          "[Backend] taskkill warning:",
+          error.message,
+          stdout || "",
+          stderr || ""
+        );
+      } else {
+        console.log("[Backend] taskkill success:", stdout || "terminated");
+      }
+
+      if (callback) callback();
+    }
+  );
+}
+
 function killBackend() {
-  if (!backendProcess) return;
-  try {
-    backendProcess.kill();
-  } catch (e) {
-    console.warn("[Backend] Failed to kill backend process:", e.message);
-  } finally {
+  if (isQuitting) return;
+  isQuitting = true;
+
+  const finish = () => {
     backendProcess = null;
+  };
+
+  if (backendProcess) {
+    try {
+      if (process.platform === "win32") {
+        forceKillBackendByName(finish);
+      } else {
+        backendProcess.kill("SIGTERM");
+        finish();
+      }
+    } catch (e) {
+      console.warn("[Backend] Failed to kill backend process:", e.message);
+
+      if (process.platform === "win32") {
+        forceKillBackendByName(finish);
+      } else {
+        finish();
+      }
+    }
+  } else {
+    if (process.platform === "win32") {
+      forceKillBackendByName(finish);
+    } else {
+      finish();
+    }
   }
 }
 
@@ -213,7 +365,7 @@ app.whenReady().then(async () => {
   startBackend();
 
   try {
-    await waitForBackend("http://127.0.0.1:8000/admin/", 25000);
+    await waitForBackend(`http://${BACKEND_HOST}:${BACKEND_PORT}/admin/`, 25000);
     console.log("[Backend] Ready");
   } catch (e) {
     console.warn("[Backend] Warning:", e.message);
@@ -222,13 +374,28 @@ app.whenReady().then(async () => {
   createWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   });
 });
 
-app.on("before-quit", killBackend);
-app.on("will-quit", killBackend);
+app.on("before-quit", () => {
+  killBackend();
+});
+
+app.on("will-quit", () => {
+  killBackend();
+});
+
+app.on("quit", () => {
+  killBackend();
+});
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  killBackend();
+
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });

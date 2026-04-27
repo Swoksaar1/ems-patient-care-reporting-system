@@ -1,33 +1,30 @@
-from django.db import models, transaction
-from django.utils import timezone
-import re
+from django.db import models
 
 
 class Patient(models.Model):
+    SEX_NA = "na"
+    SEX_MALE = "male"
+    SEX_FEMALE = "female"
+
     SEX_CHOICES = [
-        ("male", "Male"),
-        ("female", "Female"),
+        (SEX_NA, "N/A"),
+        (SEX_MALE, "Male"),
+        (SEX_FEMALE, "Female"),
     ]
 
-    first_name = models.CharField(max_length=120)
-    middle_name = models.CharField(max_length=120, blank=True, default="")
-    last_name = models.CharField(max_length=120, blank=True, default="")
-
+    full_name = models.CharField(max_length=255, blank=True, default="")
+    age = models.CharField(max_length=3, blank=True, default="")
     address = models.TextField(blank=True, default="")
-    sex = models.CharField(max_length=10, choices=SEX_CHOICES, default="male")
-    weight = models.CharField(max_length=30, blank=True, default="")
+    sex = models.CharField(max_length=10, choices=SEX_CHOICES, default=SEX_NA)
     contact_number = models.CharField(max_length=40, blank=True, default="")
 
-    chief_complaint = models.TextField()
+    chief_complaint = models.TextField(blank=True, default="")
     assessment = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        full_name = " ".join(
-            part for part in [self.first_name, self.middle_name, self.last_name] if part
-        ).strip()
-        return full_name or self.first_name
+        return self.full_name or "Unnamed Patient"
 
 
 class Report(models.Model):
@@ -38,15 +35,29 @@ class Report(models.Model):
         ("closed", "Closed"),
     ]
 
+    CASE_TYPE_CHOICES = [
+        ("medical", "Medical"),
+        ("trauma", "Trauma"),
+        ("interfacility", "Interfacility"),
+        ("hostran", "Hostran"),
+        ("standby_medics", "Standby Medics"),
+        ("back_to_base", "Back to Base"),
+    ]
+
     patient = models.ForeignKey(
         Patient,
         on_delete=models.CASCADE,
         related_name="reports"
     )
 
-    ambulance_body_no = models.CharField(max_length=60)
-    call_no = models.CharField(max_length=60)
-    case_no = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    case_no = models.CharField(max_length=100, blank=True, default="")
+    ambulance_body_no = models.CharField(max_length=60, blank=True, default="")
+    case_type = models.CharField(
+        max_length=30,
+        choices=CASE_TYPE_CHOICES,
+        default="medical",
+        blank=True,
+    )
 
     patient_location = models.TextField(blank=True, default="")
     transported_to = models.TextField(blank=True, default="")
@@ -82,41 +93,8 @@ class Report(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def is_valid_case_no(self):
-        if not self.case_no:
-            return False
-        return bool(re.fullmatch(r"\d{2}-\d{4}", str(self.case_no)))
-
-    def generate_case_no(self):
-        year_short = str(timezone.now().year)[-2:]
-
-        latest_report = (
-            Report.objects.select_for_update()
-            .filter(case_no__regex=rf"^{year_short}-\d{{4}}$")
-            .order_by("-case_no")
-            .first()
-        )
-
-        latest_number = 0
-        if latest_report and latest_report.case_no:
-            try:
-                latest_number = int(latest_report.case_no.split("-")[1])
-            except (IndexError, ValueError):
-                latest_number = 0
-
-        next_number = latest_number + 1
-        return f"{year_short}-{next_number:04d}"
-
-    def save(self, *args, **kwargs):
-        if not self.is_valid_case_no():
-            with transaction.atomic():
-                self.case_no = self.generate_case_no()
-                return super().save(*args, **kwargs)
-
-        return super().save(*args, **kwargs)
-
     def __str__(self):
-        return f"{self.case_no} - {self.patient}"
+        return f"Report {self.id} - {self.patient}"
 
 
 class Vital(models.Model):
@@ -129,6 +107,7 @@ class Vital(models.Model):
     time = models.DateTimeField(null=True, blank=True)
     bp = models.CharField(max_length=30, blank=True, default="")
     pulse_rate = models.CharField(max_length=30, blank=True, default="")
+    pulse_status = models.CharField(max_length=40, blank=True, default="na")
     resp_rate = models.CharField(max_length=30, blank=True, default="")
     resp_quality = models.CharField(max_length=40, blank=True, default="normal")
 
@@ -245,12 +224,14 @@ class Incident(models.Model):
         related_name="incident"
     )
 
+    LOC_NA = "na"
     LOC_AWAKE = "awake"
     LOC_VERBAL = "verbal"
     LOC_PAIN = "pain"
     LOC_UNCONSCIOUS = "unconscious"
 
     LOC_CHOICES = [
+        (LOC_NA, "N/A"),
         (LOC_AWAKE, "Awake"),
         (LOC_VERBAL, "Verbal"),
         (LOC_PAIN, "Pain"),
@@ -260,7 +241,7 @@ class Incident(models.Model):
     level_of_consciousness = models.CharField(
         max_length=20,
         choices=LOC_CHOICES,
-        default=LOC_AWAKE,
+        default=LOC_NA,
         blank=True,
         null=True,
     )

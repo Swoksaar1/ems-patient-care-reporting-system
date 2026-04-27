@@ -1,11 +1,17 @@
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
   width: 260px;
+  min-width: 260px;
+  height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
+  transition:
+    width 0.3s ease,
+    min-width 0.3s ease;
 
   background: linear-gradient(
     180deg,
@@ -16,6 +22,12 @@
   box-shadow: 10px 0 40px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  z-index: 50;
+}
+
+.sidebar.collapsed {
+  width: 96px;
+  min-width: 96px;
 }
 
 .sidebar-bg-glow {
@@ -39,20 +51,29 @@
   height: 220px;
   right: -80px;
   bottom: 80px;
-  background: rgba(20, 184, 166, 0.10);
+  background: rgba(20, 184, 166, 0.1);
 }
 
 .sidebar-container {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   padding: 22px 16px;
 }
 
 .sidebar-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 28px;
+}
+
+.sidebar-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .logo-box {
@@ -79,6 +100,12 @@
   object-fit: contain;
   display: block;
   padding: 7px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.brand {
+  min-width: 0;
 }
 
 .brand h2 {
@@ -99,10 +126,41 @@
   color: rgba(238, 246, 255, 0.58);
 }
 
+.hamburger-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  transition:
+    background 0.25s ease,
+    transform 0.25s ease;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  position: relative;
+  z-index: 5;
+}
+
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(1.05);
+}
+
+.hamburger-btn:active {
+  transform: scale(0.98);
+}
+
 .nav {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  z-index: 3;
 }
 
 .nav-item {
@@ -111,25 +169,36 @@
   align-items: center;
   gap: 12px;
   min-height: 48px;
+  width: 100%;
   padding: 0 14px;
   border-radius: 16px;
   text-decoration: none;
   color: rgba(238, 246, 255, 0.76);
   font-size: 0.92rem;
   font-weight: 700;
-  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
   border: 1px solid transparent;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 
 .nav-item .icon {
   width: 20px;
+  min-width: 20px;
   text-align: center;
   font-size: 1rem;
   flex-shrink: 0;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .nav-item .label {
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .nav-item:hover {
@@ -146,7 +215,7 @@
     rgba(56, 189, 248, 0.18),
     rgba(20, 184, 166, 0.12)
   );
-  border-color: rgba(56, 189, 248, 0.20);
+  border-color: rgba(56, 189, 248, 0.2);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
 }
 
@@ -162,40 +231,10 @@
   box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
 }
 
-.sidebar-footer {
-  position: relative;
-  z-index: 1;
-  padding: 16px;
-  text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(238, 246, 255, 0.46);
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-@media (max-width: 1050px) {
-  .sidebar {
-    width: 224px;
-  }
-
-  .brand span {
-    font-size: 0.72rem;
-  }
-
-  .nav-item {
-    font-size: 0.88rem;
-  }
-}
-
-@media (max-width: 850px) {
-  .sidebar {
-    display: none;
-  }
-}
 .logout-btn {
   margin-top: 18px;
   width: 100%;
+  min-height: 48px;
   border: none;
   outline: none;
   cursor: pointer;
@@ -205,13 +244,162 @@
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(255, 77, 77, 0.12);
-  color: #fff;
+  color: #ffffff;
   font-size: 15px;
   font-weight: 600;
-  transition: all 0.25s ease;
+  transition:
+    background 0.25s ease,
+    transform 0.25s ease;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 3;
+}
+
+.logout-btn .icon,
+.logout-btn .label {
+  pointer-events: none;
 }
 
 .logout-btn:hover {
   background: rgba(255, 77, 77, 0.22);
   transform: translateX(4px);
+}
+
+.sidebar-footer {
+  position: relative;
+  z-index: 2;
+  padding: 16px;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(238, 246, 255, 0.46);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Collapsed sidebar */
+.sidebar.collapsed .sidebar-container {
+  padding: 18px 10px;
+}
+
+.sidebar.collapsed .sidebar-top {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.sidebar.collapsed .sidebar-brand-wrap {
+  flex: none;
+  justify-content: center;
+  width: 100%;
+}
+
+.sidebar.collapsed .logo-box {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+}
+
+.sidebar.collapsed .hamburger-btn {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  border-radius: 16px;
+}
+
+.sidebar.collapsed .nav {
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.sidebar.collapsed .nav-item {
+  width: 56px;
+  height: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  gap: 0;
+  border-radius: 18px;
+  flex: 0 0 56px;
+}
+
+.sidebar.collapsed .nav-item:hover {
+  transform: translateX(0) scale(1.04);
+}
+
+.sidebar.collapsed .nav-item .icon {
+  width: auto;
+  min-width: 0;
+  font-size: 1.15rem;
+  display: grid;
+  place-items: center;
+}
+
+.sidebar.collapsed .nav-item.active::before {
+  left: -6px;
+  top: 14px;
+  bottom: 14px;
+}
+
+.sidebar.collapsed .logout-btn {
+  width: 56px;
+  height: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin: 18px auto 0;
+  border-radius: 18px;
+  gap: 0;
+}
+
+.sidebar.collapsed .logout-btn:hover {
+  transform: scale(1.04);
+}
+
+.sidebar.collapsed .logout-btn .icon {
+  width: auto;
+  font-size: 1.05rem;
+}
+
+/* Responsive */
+@media (max-width: 1050px) {
+  .sidebar {
+    width: 224px;
+    min-width: 224px;
+  }
+
+  .brand span {
+    font-size: 0.72rem;
+  }
+
+  .nav-item {
+    font-size: 0.88rem;
+  }
+
+  .sidebar.collapsed {
+    width: 92px;
+    min-width: 92px;
+  }
+}
+
+@media (max-width: 850px) {
+  .sidebar {
+    position: relative;
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    min-height: auto;
+  }
+
+  .sidebar.collapsed {
+    width: 96px;
+    min-width: 96px;
+  }
 }

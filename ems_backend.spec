@@ -1,12 +1,35 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
-    ['backend_launcher.py'],
+    ["backend_launcher.py"],
     pathex=[],
     binaries=[],
-    datas=[('ems_system', 'ems_system'), ('reports', 'reports'), ('manage.py', '.'), ('db.sqlite3', '.'), ('media', 'media')],
-    hiddenimports=[],
+    datas=[
+        ("ems_system", "ems_system"),
+        ("reports", "reports"),
+        ("manage.py", "."),
+    ],
+    hiddenimports=[
+        "django",
+        "django.contrib.admin",
+        "django.contrib.auth",
+        "django.contrib.contenttypes",
+        "django.contrib.sessions",
+        "django.contrib.messages",
+        "django.contrib.staticfiles",
+        "corsheaders",
+        "rest_framework",
+        "rest_framework_simplejwt",
+        "reports",
+        "reports.models",
+        "reports.views",
+        "reports.urls",
+        "reports.serializers",
+        "ems_system",
+        "ems_system.settings",
+        "ems_system.urls",
+        "ems_system.wsgi",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -14,6 +37,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -22,7 +46,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ems_backend',
+    name="ems_backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

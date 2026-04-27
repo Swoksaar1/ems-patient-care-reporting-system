@@ -585,4 +585,41 @@
   .nr-btn {
     width: 100%;
   }
+
+}
+.nr-field input[inputmode="numeric"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.nr-field input::placeholder {
+  letter-spacing: 0.02em;
+}
+
+.nr-field input[name="age"] {
+  letter-spacing: normal;
+}
+
+.nr-field input[inputmode="numeric"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.nr-field input[inputmode="numeric"]::placeholder {
+  color: rgba(238, 246, 255, 0.42);
+  letter-spacing: 0.08em;
+}
+
+.nr-field input[name="age"] {
+  letter-spacing: normal;
+}
+
+.nr-field input[inputmode="numeric"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.nr-field input[inputmode="numeric"]::placeholder {
+  color: rgba(238, 246, 255, 0.42);
+  letter-spacing: 0.08em;
 }

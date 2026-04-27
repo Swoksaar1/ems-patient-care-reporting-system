@@ -19,20 +19,21 @@ from .models import (
 
 User = get_user_model()
 
+OPTIONAL_MIN_FIELDS_CASE_TYPES = {"hostran", "standby_medics", "back_to_base"}
 
-# =========================
-# MODEL SERIALIZERS (READ / OUTPUT)
-# =========================
+
+def clean_age(value):
+    value = "" if value is None else str(value)
+    return "".join(ch for ch in value if ch.isdigit())[:3]
+
 
 class PatientSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(required=True, allow_blank=False)
-    middle_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    last_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    sex = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="male")
-    weight = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    full_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    age = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="", max_length=3)
+    sex = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="na")
     contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     address = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    chief_complaint = serializers.CharField(required=True, allow_blank=False)
+    chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     assessment = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
 
     class Meta:
@@ -49,6 +50,7 @@ class VitalSerializer(serializers.ModelSerializer):
             "time",
             "bp",
             "pulse_rate",
+            "pulse_status",
             "resp_rate",
             "resp_quality",
             "temperature_value",
@@ -66,11 +68,18 @@ class AttachmentMixin(serializers.ModelSerializer):
     attachment_url = serializers.SerializerMethodField()
 
     def get_attachment_url(self, obj):
-        if not getattr(obj, "attachment", None):
+        try:
+            attachment = getattr(obj, "attachment", None)
+
+            if not attachment:
+                return None
+
+            url = attachment.url
+            request = self.context.get("request")
+
+            return request.build_absolute_uri(url) if request else url
+        except Exception:
             return None
-        request = self.context.get("request")
-        url = obj.attachment.url
-        return request.build_absolute_uri(url) if request else url
 
 
 class GCSSerializer(serializers.ModelSerializer):
@@ -125,12 +134,12 @@ class ReportListSerializer(AttachmentMixin):
         model = Report
         fields = [
             "id",
+            "case_no",
             "patient",
             "patient_name",
             "chief_complaint",
             "ambulance_body_no",
-            "call_no",
-            "case_no",
+            "case_type",
             "patient_location",
             "transported_to",
             "doi",
@@ -151,17 +160,12 @@ class ReportListSerializer(AttachmentMixin):
             "attachment",
             "attachment_url",
         ]
-        read_only_fields = ["id", "case_no", "created_at", "attachment_url"]
+        read_only_fields = ["id", "created_at", "attachment_url"]
 
     def get_patient_name(self, obj):
-        if not obj.patient:
-            return ""
-        parts = [
-            obj.patient.first_name or "",
-            obj.patient.middle_name or "",
-            obj.patient.last_name or "",
-        ]
-        return " ".join(p for p in parts if p).strip()
+        if obj.patient:
+            return (obj.patient.full_name or "").strip()
+        return ""
 
     def get_chief_complaint(self, obj):
         return (obj.patient.chief_complaint or "") if obj.patient else ""
@@ -182,10 +186,10 @@ class ReportDetailSerializer(AttachmentMixin):
         model = Report
         fields = [
             "id",
+            "case_no",
             "patient",
             "ambulance_body_no",
-            "call_no",
-            "case_no",
+            "case_type",
             "patient_location",
             "transported_to",
             "doi",
@@ -214,23 +218,18 @@ class ReportDetailSerializer(AttachmentMixin):
             "attachment",
             "attachment_url",
         ]
-        read_only_fields = ["id", "case_no", "created_at", "attachment_url"]
+        read_only_fields = ["id", "created_at", "attachment_url"]
 
-
-# =========================
-# PAYLOAD SERIALIZERS (WRITE / INPUT)
-# =========================
 
 class PatientPayloadSerializer(serializers.Serializer):
-    first_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    middle_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    last_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    sex = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="male")
-    weight = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    full_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    age = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="", max_length=3)
+    sex = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="na")
     contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     address = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
-    chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     assessment = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    case_type = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
 
 
 class GCSPayloadSerializer(serializers.Serializer):
@@ -281,6 +280,7 @@ class VitalPayloadSerializer(serializers.Serializer):
     time = serializers.DateTimeField(required=False, allow_null=True)
     bp = serializers.CharField(required=False, allow_blank=True)
     pulse_rate = serializers.CharField(required=False, allow_blank=True)
+    pulse_status = serializers.CharField(required=False, allow_blank=True)
     resp_rate = serializers.CharField(required=False, allow_blank=True)
     resp_quality = serializers.CharField(required=False, allow_blank=True)
     temperature_value = serializers.CharField(required=False, allow_blank=True)
@@ -292,26 +292,20 @@ class VitalPayloadSerializer(serializers.Serializer):
     location = serializers.CharField(required=False, allow_blank=True)
 
 
-# =========================
-# REPORT CREATE/UPDATE
-# =========================
-
 class ReportCreateSerializer(serializers.Serializer):
     patient = PatientPayloadSerializer(required=False)
 
-    # flat patient fields for frontend compatibility
-    first_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    middle_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    last_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    full_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    age = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=3)
     sex = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    weight = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     assessment = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    case_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
-    ambulance_body_no = serializers.CharField(required=False, allow_blank=True)
-    call_no = serializers.CharField(required=False, allow_blank=True)
+    case_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    ambulance_body_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     patient_location = serializers.CharField(required=False, allow_blank=True)
     transported_to = serializers.CharField(required=False, allow_blank=True)
 
@@ -345,11 +339,22 @@ class ReportCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         patient_data = attrs.get("patient") or {}
 
-        first_name = (
-            patient_data.get("first_name")
-            if "first_name" in patient_data
-            else attrs.get("first_name", "")
-        ) or ""
+        current_case_type = ""
+        if self.instance is not None:
+            current_case_type = getattr(self.instance, "case_type", "") or ""
+
+        case_type = (
+            attrs.get("case_type")
+            or patient_data.get("case_type")
+            or current_case_type
+            or ""
+        )
+        case_type = str(case_type).strip().lower()
+
+        is_relaxed_case = case_type in OPTIONAL_MIN_FIELDS_CASE_TYPES
+
+        if self.partial:
+            return attrs
 
         chief_complaint = (
             patient_data.get("chief_complaint")
@@ -358,23 +363,16 @@ class ReportCreateSerializer(serializers.Serializer):
         ) or ""
 
         ambulance_body_no = attrs.get("ambulance_body_no", "") or ""
-        call_no = attrs.get("call_no", "") or ""
 
         errors = {}
 
-        if not str(first_name).strip():
-            errors.setdefault("patient", {})
-            errors["patient"]["first_name"] = ["This field may not be blank."]
+        if not is_relaxed_case:
+            if not str(chief_complaint).strip():
+                errors.setdefault("patient", {})
+                errors["patient"]["chief_complaint"] = ["This field may not be blank."]
 
-        if not str(chief_complaint).strip():
-            errors.setdefault("patient", {})
-            errors["patient"]["chief_complaint"] = ["This field may not be blank."]
-
-        if not str(ambulance_body_no).strip():
-            errors["ambulance_body_no"] = ["This field may not be blank."]
-
-        if not str(call_no).strip():
-            errors["call_no"] = ["This field may not be blank."]
+            if not str(ambulance_body_no).strip():
+                errors["ambulance_body_no"] = ["This field may not be blank."]
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -385,16 +383,50 @@ class ReportCreateSerializer(serializers.Serializer):
         nested = validated_data.get("patient") or {}
 
         return {
-            "first_name": (nested.get("first_name", validated_data.get("first_name", "")) or "").strip(),
-            "middle_name": (nested.get("middle_name", validated_data.get("middle_name", "")) or "").strip(),
-            "last_name": (nested.get("last_name", validated_data.get("last_name", "")) or "").strip(),
-            "sex": (nested.get("sex", validated_data.get("sex", "male")) or "male").strip(),
-            "weight": (nested.get("weight", validated_data.get("weight", "")) or "").strip(),
+            "full_name": (nested.get("full_name", validated_data.get("full_name", "")) or "").strip(),
+            "age": clean_age(nested.get("age", validated_data.get("age", ""))),
+            "sex": (nested.get("sex", validated_data.get("sex", "na")) or "na").strip(),
             "contact_number": (nested.get("contact_number", validated_data.get("contact_number", "")) or "").strip(),
             "address": (nested.get("address", validated_data.get("address", "")) or "").strip(),
             "chief_complaint": (nested.get("chief_complaint", validated_data.get("chief_complaint", "")) or "").strip(),
             "assessment": (nested.get("assessment", validated_data.get("assessment", "")) or "").strip(),
         }
+
+    def _extract_patient_patch_data(self, validated_data):
+        nested = validated_data.get("patient") or {}
+        out = {}
+
+        field_names = [
+            "full_name",
+            "age",
+            "sex",
+            "contact_number",
+            "address",
+            "chief_complaint",
+            "assessment",
+        ]
+
+        for field in field_names:
+            if field in nested:
+                value = nested.get(field)
+
+                if field == "age":
+                    out[field] = clean_age(value)
+                elif field == "sex":
+                    out[field] = (value or "na").strip() if isinstance(value, str) else (value or "na")
+                else:
+                    out[field] = (value or "").strip() if isinstance(value, str) else (value or "")
+            elif field in validated_data:
+                value = validated_data.get(field)
+
+                if field == "age":
+                    out[field] = clean_age(value)
+                elif field == "sex":
+                    out[field] = (value or "na").strip() if isinstance(value, str) else (value or "na")
+                else:
+                    out[field] = (value or "").strip() if isinstance(value, str) else (value or "")
+
+        return out
 
     @transaction.atomic
     def create(self, validated_data):
@@ -413,8 +445,9 @@ class ReportCreateSerializer(serializers.Serializer):
 
         report = Report.objects.create(
             patient=patient,
-            ambulance_body_no=validated_data.get("ambulance_body_no", ""),
-            call_no=validated_data.get("call_no", ""),
+            case_no=validated_data.get("case_no", "") or "",
+            ambulance_body_no=validated_data.get("ambulance_body_no", "") or "",
+            case_type=validated_data.get("case_type", "medical") or "medical",
             patient_location=validated_data.get("patient_location", ""),
             transported_to=validated_data.get("transported_to", ""),
             doi=validated_data.get("doi"),
@@ -440,6 +473,7 @@ class ReportCreateSerializer(serializers.Serializer):
                 time=v.get("time"),
                 bp=v.get("bp", ""),
                 pulse_rate=v.get("pulse_rate", ""),
+                pulse_status=v.get("pulse_status", "na"),
                 resp_rate=v.get("resp_rate", ""),
                 resp_quality=v.get("resp_quality", ""),
                 temperature_value=v.get("temperature_value", ""),
@@ -489,7 +523,7 @@ class ReportCreateSerializer(serializers.Serializer):
         if incident_data:
             Incident.objects.create(
                 report=report,
-                level_of_consciousness=incident_data.get("level_of_consciousness") or Incident.LOC_AWAKE,
+                level_of_consciousness=incident_data.get("level_of_consciousness") or Incident.LOC_NA,
             )
 
         return report
@@ -497,15 +531,23 @@ class ReportCreateSerializer(serializers.Serializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         patient = instance.patient
-        patient_data = self._extract_patient_data(validated_data)
+
+        patient_data = (
+            self._extract_patient_patch_data(validated_data)
+            if self.partial
+            else self._extract_patient_data(validated_data)
+        )
 
         for field, value in patient_data.items():
             setattr(patient, field, value)
-        patient.save()
+
+        if patient_data:
+            patient.save()
 
         report_fields = [
+            "case_no",
             "ambulance_body_no",
-            "call_no",
+            "case_type",
             "patient_location",
             "transported_to",
             "doi",
@@ -521,6 +563,7 @@ class ReportCreateSerializer(serializers.Serializer):
             "back_in_service_time",
             "intervention_notes",
         ]
+
         for field in report_fields:
             if field in validated_data:
                 setattr(instance, field, validated_data.get(field))
@@ -538,6 +581,7 @@ class ReportCreateSerializer(serializers.Serializer):
                     time=v.get("time"),
                     bp=v.get("bp", ""),
                     pulse_rate=v.get("pulse_rate", ""),
+                    pulse_status=v.get("pulse_status", "na"),
                     resp_rate=v.get("resp_rate", ""),
                     resp_quality=v.get("resp_quality", ""),
                     temperature_value=v.get("temperature_value", ""),
@@ -578,6 +622,7 @@ class ReportCreateSerializer(serializers.Serializer):
 
             if apgar_data:
                 instance.apgar_enabled = True
+
                 if apgar_obj:
                     apgar_obj.appearance = apgar_data.get("appearance", apgar_obj.appearance)
                     apgar_obj.pulse = apgar_data.get("pulse", apgar_obj.pulse)
@@ -598,6 +643,7 @@ class ReportCreateSerializer(serializers.Serializer):
                     )
             else:
                 instance.apgar_enabled = False
+
                 if apgar_obj:
                     apgar_obj.delete()
 
@@ -607,6 +653,7 @@ class ReportCreateSerializer(serializers.Serializer):
 
             if nt_data:
                 instance.non_transport_enabled = True
+
                 if nt_obj:
                     nt_obj.reason = nt_data.get("reason", nt_obj.reason)
                     nt_obj.save()
@@ -617,6 +664,7 @@ class ReportCreateSerializer(serializers.Serializer):
                     )
             else:
                 instance.non_transport_enabled = False
+
                 if nt_obj:
                     nt_obj.delete()
 
@@ -683,7 +731,7 @@ class ReportCreateSerializer(serializers.Serializer):
                 else:
                     Incident.objects.create(
                         report=instance,
-                        level_of_consciousness=incident_data.get("level_of_consciousness") or Incident.LOC_AWAKE,
+                        level_of_consciousness=incident_data.get("level_of_consciousness") or Incident.LOC_NA,
                     )
             else:
                 if incident_obj:
@@ -696,10 +744,6 @@ class ReportCreateSerializer(serializers.Serializer):
         return ReportDetailSerializer(instance, context=self.context).data
 
 
-# =========================
-# ACCOUNT / AUTH SERIALIZER
-# =========================
-
 class AccountUpdateSerializer(serializers.Serializer):
     username = serializers.CharField(required=False, allow_blank=False, max_length=150)
     current_password = serializers.CharField(required=False, write_only=True, allow_blank=False)
@@ -708,8 +752,10 @@ class AccountUpdateSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         user = self.context["request"].user
+
         if User.objects.exclude(pk=user.pk).filter(username=value).exists():
             raise serializers.ValidationError("Username is already taken.")
+
         return value
 
     def validate(self, attrs):
@@ -726,6 +772,7 @@ class AccountUpdateSerializer(serializers.Serializer):
                 })
 
             user = self.context["request"].user
+
             if not user.check_password(current_password):
                 raise serializers.ValidationError({
                     "current_password": "Current password is incorrect."

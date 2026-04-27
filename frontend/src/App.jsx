@@ -8,6 +8,7 @@ import "./App.css";
 
 const Dashboard = lazy(() => import("./components/pages/Dashboard"));
 const NewReport = lazy(() => import("./components/pages/NewReport"));
+const Patients = lazy(() => import("./components/pages/Patients"));
 const Reports = lazy(() => import("./components/pages/Reports"));
 const Settings = lazy(() => import("./components/pages/Settings"));
 
@@ -181,10 +182,10 @@ export default function App() {
         />
 
         <Route
-          path="/reports"
+          path="/patients"
           element={
             <ProtectedRoute>
-              <Reports />
+              <Patients />
             </ProtectedRoute>
           }
         />
@@ -194,6 +195,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <NewReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <Reports />
             </ProtectedRoute>
           }
         />
