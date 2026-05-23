@@ -82,12 +82,12 @@
 
 .rp-filters {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) 220px;
+  grid-template-columns: minmax(280px, 1fr) 220px 190px;
   gap: 12px;
   align-items: center;
   justify-content: end;
   width: 100%;
-  max-width: 980px;
+  max-width: 1180px;
   margin-left: auto;
 }
 
@@ -185,7 +185,8 @@ select.rp-input option:checked {
 
 /* Card */
 .rp-card {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: var(--rp-r-xl);
   background: linear-gradient(
     135deg,
@@ -201,6 +202,7 @@ select.rp-input option:checked {
 /* Table */
 .rp-table {
   width: 100%;
+  min-width: 1280px;
   border-collapse: collapse;
 }
 
@@ -1176,7 +1178,7 @@ select.rp-input option:checked {
   }
 
   .rp-table {
-    min-width: 1180px;
+    min-width: 1280px;
   }
 }
 
@@ -1214,7 +1216,7 @@ select.rp-input option:checked {
 .rp-header-tools {
   display: grid;
   gap: 10px;
-  width: min(980px, 100%);
+  width: min(1180px, 100%);
   margin-left: auto;
 }
 

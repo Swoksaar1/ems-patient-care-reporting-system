@@ -1,5 +1,4 @@
 :root {
-  /* App (dark UI) */
   --reports-text: #eef2ff;
   --reports-text-soft: rgba(238, 242, 255, 0.78);
   --reports-text-muted: rgba(238, 242, 255, 0.55);
@@ -8,7 +7,6 @@
   --reports-shadow-md: 0 12px 28px rgba(0, 0, 0, 0.16);
   --reports-r-xl: 24px;
 
-  /* Report (PDF-ish) palette */
   --report-navy: #0b1220;
   --report-blue: #4338ca;
   --report-border-soft: #94a3b8;
@@ -16,13 +14,11 @@
   --report-text-sub: #475569;
   --report-row: #f8fafc;
 
-  /* Table header / totals */
   --report-th-bg: #eef2ff;
   --report-th-text: #1e1b4b;
   --report-total-bg: #dbeafe;
   --report-total-text: #1e3a8a;
 
-  /* Section header colors */
   --section-response-bg: #e0f2fe;
   --section-response-text: #075985;
 
@@ -506,7 +502,7 @@
 .report-table td {
   border: 1px solid var(--report-border-soft);
   padding: 1.8mm 2mm;
-  vertical-align: middle;
+  vertical-align: middle !important;
 }
 
 .report-table th {
@@ -537,11 +533,13 @@
   background: #edf5fd;
   font-weight: 700;
   color: #163a5f;
+  text-align: left !important;
 }
 
 .report-main-table tr td:last-child {
   background: #f9fcff;
-  font-weight: 700;
+  font-weight: 800;
+  text-align: center !important;
 }
 
 .total-row td {
@@ -551,18 +549,17 @@
 }
 
 .text-right {
-  text-align: right;
+  text-align: center !important;
 }
 
 .empty-cell {
-  text-align: center;
+  text-align: center !important;
   color: #6a7684;
   font-style: italic;
   padding: 3mm 1.6mm;
   background: #f7fafc !important;
 }
 
-/* NEW: stable section-based coloring (replaces nth-of-type rules) */
 .report-table.section-response thead th {
   background: var(--section-response-bg);
   color: var(--section-response-text);
@@ -593,6 +590,62 @@
   color: #163a5f;
 }
 
+.report-table.section-response td:first-child,
+.report-table.section-medical td:first-child,
+.report-table.section-trauma td:first-child,
+.report-table.section-facility td:first-child,
+.report-table.section-barangay td:first-child,
+.section-standby td:first-child,
+.classification-table td:first-child {
+  text-align: left !important;
+}
+
+.report-table.section-response td:nth-child(2),
+.report-table.section-response td:nth-child(3),
+.report-table.section-medical td:nth-child(2),
+.report-table.section-medical td:nth-child(3),
+.report-table.section-trauma td:nth-child(2),
+.report-table.section-trauma td:nth-child(3),
+.report-table.section-facility td:nth-child(2),
+.report-table.section-facility td:nth-child(3),
+.report-table.section-barangay td:nth-child(2),
+.report-table.section-barangay td:nth-child(3),
+.section-standby td:nth-child(2),
+.section-standby td:nth-child(3),
+.classification-table td:nth-child(2),
+.classification-table td:nth-child(3) {
+  text-align: center !important;
+}
+
+.report-daily-table {
+  table-layout: auto;
+}
+
+.report-daily-table th,
+.report-daily-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.report-daily-table th:first-child,
+.report-daily-table td:first-child {
+  text-align: center !important;
+}
+
+.report-daily-table td:last-child {
+  font-weight: 800 !important;
+}
+
+.report-sheet-detailed-final {
+  padding-bottom: 70mm;
+}
+
+.report-sheet-detailed-final .report-daily-table th,
+.report-sheet-detailed-final .report-daily-table td {
+  padding: 1.25mm 1.35mm;
+  font-size: 10.5px;
+}
+
 .report-barangay-table {
   table-layout: fixed;
 }
@@ -601,6 +654,17 @@
 .report-barangay-table td {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.report-barangay-table th:first-child,
+.report-barangay-table td:first-child {
+  text-align: left !important;
+}
+
+.report-barangay-table td:last-child {
+  font-weight: 800 !important;
 }
 
 .report-table-sm td,
@@ -616,23 +680,35 @@
 .classification-table th,
 .classification-table td {
   font-size: 12px;
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .classification-table th:first-child,
 .classification-table td:first-child {
   width: 58%;
+  text-align: left !important;
 }
 
 .classification-table th:nth-child(2),
 .classification-table td:nth-child(2) {
   width: 22%;
-  text-align: center;
+  text-align: center !important;
 }
 
 .classification-table th:nth-child(3),
 .classification-table td:nth-child(3) {
   width: 20%;
-  text-align: center;
+  text-align: center !important;
+}
+
+.total-row td {
+  text-align: center !important;
+  font-weight: 800 !important;
+}
+
+.total-row td:first-child {
+  text-align: left !important;
 }
 
 .report-approval-footer {
@@ -735,4 +811,739 @@
   .reports-visible-preview {
     padding: 10px;
   }
+}
+.report-sheet-ambulance-graph {
+  padding-bottom: 44mm;
+}
+
+.report-ambulance-graph-card {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 4mm;
+  padding: 5mm;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-sizing: border-box;
+}
+
+.report-ambulance-graph-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5mm;
+  margin-bottom: 5mm;
+}
+
+.report-ambulance-graph-title-row h4 {
+  margin: 0;
+  color: #111827;
+  font-size: 4mm;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.report-ambulance-graph-title-row p {
+  margin: 1mm 0 0;
+  color: #64748b;
+  font-size: 2.9mm;
+  font-weight: 600;
+}
+
+.report-ambulance-total-card {
+  min-width: 30mm;
+  padding: 2.5mm 3mm;
+  border-radius: 3mm;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  text-align: center;
+}
+
+.report-ambulance-total-card span {
+  display: block;
+  color: #075985;
+  font-size: 2.45mm;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-ambulance-total-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 7mm;
+  font-weight: 900;
+  line-height: 1.05;
+  margin-top: 0.8mm;
+}
+
+.report-ambulance-chart {
+  display: grid;
+  grid-template-columns: 12mm 1fr;
+  gap: 3mm;
+  height: 78mm;
+  padding: 4mm 4mm 2mm;
+  border: 1px solid #dbeafe;
+  border-radius: 4mm;
+  background:
+    repeating-linear-gradient(
+      to top,
+      rgba(148, 163, 184, 0.22) 0,
+      rgba(148, 163, 184, 0.22) 1px,
+      transparent 1px,
+      transparent 19mm
+    ),
+    #ffffff;
+  box-sizing: border-box;
+  margin-bottom: 5mm;
+}
+
+.report-ambulance-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #64748b;
+  font-size: 2.45mm;
+  font-weight: 800;
+  padding-bottom: 11mm;
+}
+
+.report-ambulance-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6mm;
+  align-items: end;
+  height: 100%;
+}
+
+.report-ambulance-bar-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.report-ambulance-bar-wrap {
+  width: 100%;
+  height: 55mm;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.report-ambulance-bar {
+  width: 18mm;
+  min-height: 3mm;
+  border-radius: 3mm 3mm 1mm 1mm;
+  background: linear-gradient(180deg, #67e8f9 0%, #38bdf8 48%, #14b8a6 100%);
+  border: 1px solid rgba(14, 116, 144, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-shadow: 0 7px 16px rgba(14, 165, 233, 0.18);
+  overflow: visible;
+}
+
+.report-ambulance-bar span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 8mm;
+  height: 5mm;
+  margin-top: -6mm;
+  border-radius: 2mm;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 2.8mm;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.report-ambulance-bar-label {
+  width: 100%;
+  color: #0f172a;
+  font-size: 2.75mm;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  margin-top: 2.2mm;
+  word-break: break-word;
+}
+
+.report-ambulance-bar-percent {
+  color: #64748b;
+  font-size: 2.45mm;
+  font-weight: 800;
+  margin-top: 0.7mm;
+}
+
+.report-ambulance-summary-table th,
+.report-ambulance-summary-table td {
+  text-align: center !important;
+}
+
+.report-ambulance-summary-table th:first-child,
+.report-ambulance-summary-table td:first-child {
+  text-align: left !important;
+}
+
+.report-sheet-daily-trend {
+  padding-bottom: 24mm;
+}
+
+.report-sheet-daily-trend-table {
+  padding-bottom: 50mm;
+}
+
+.report-sheet-daily-trend-table-final {
+  padding-bottom: 72mm;
+}
+
+.report-daily-trend-card {
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 4mm;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 5mm;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.report-daily-trend-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 5mm;
+  margin-bottom: 3mm;
+}
+
+.report-daily-trend-title-row h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 4mm;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.report-daily-trend-title-row p {
+  margin: 1mm 0 0;
+  color: #475569;
+  font-size: 2.8mm;
+  font-weight: 700;
+}
+
+.report-daily-trend-total-card {
+  min-width: 30mm;
+  border-radius: 3mm;
+  background: linear-gradient(135deg, #0f172a, #1e3a8a);
+  color: #ffffff;
+  padding: 3mm 4mm;
+  text-align: center;
+}
+
+.report-daily-trend-total-card span {
+  display: block;
+  font-size: 2.4mm;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-daily-trend-total-card strong {
+  display: block;
+  margin-top: 1mm;
+  font-size: 7mm;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.report-daily-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 4mm;
+  align-items: center;
+  margin: 0 0 3mm;
+  padding: 2.2mm 3mm;
+  border-radius: 2.4mm;
+  background: #f1f5f9;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.report-daily-trend-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.4mm;
+  color: #334155;
+  font-size: 2.35mm;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.report-daily-trend-legend-dot {
+  width: 2.5mm;
+  height: 2.5mm;
+  border-radius: 999px;
+  display: inline-block;
+  border: 0.25mm solid rgba(15, 23, 42, 0.12);
+}
+
+.report-daily-trend-chart {
+  display: grid;
+  grid-template-columns: 12mm 1fr;
+  gap: 2mm;
+  height: 78mm;
+  padding: 4mm 2mm 4mm 0;
+  border-radius: 3mm;
+  background: linear-gradient(180deg, #f8fafc, #eef2ff);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  margin-bottom: 5mm;
+}
+
+.report-daily-trend-y-axis {
+  height: 66mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #64748b;
+  font-size: 2.4mm;
+  font-weight: 900;
+  padding-top: 1mm;
+}
+
+.report-daily-trend-bars {
+  display: grid;
+  gap: 0.7mm;
+  align-items: end;
+  height: 100%;
+  min-width: 0;
+}
+
+.report-daily-trend-bar-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.report-daily-trend-bar-wrap {
+  width: 100%;
+  height: 66mm;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.report-daily-trend-bar {
+  width: 100%;
+  max-width: 5.6mm;
+  min-width: 2.2mm;
+  min-height: 2mm;
+  border-radius: 2mm 2mm 0.8mm 0.8mm;
+  background: rgba(226, 232, 240, 0.9);
+  border: 1px solid rgba(14, 116, 144, 0.32);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-shadow: 0 5px 12px rgba(14, 165, 233, 0.16);
+  overflow: visible;
+  position: relative;
+}
+
+.report-daily-trend-bar-stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 2mm 2mm 0.8mm 0.8mm;
+}
+
+.report-daily-trend-bar-segment {
+  width: 100%;
+  min-height: 0.7mm;
+}
+
+.report-daily-trend-bar span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.6mm;
+  height: 4mm;
+  margin-top: -4.8mm;
+  border-radius: 1.6mm;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 2.25mm;
+  font-weight: 900;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.report-daily-trend-bar-label {
+  width: 100%;
+  min-height: 4mm;
+  color: #334155;
+  font-size: 2.05mm;
+  font-weight: 900;
+  text-align: center;
+  margin-top: 1.2mm;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.report-daily-trend-summary-table th,
+.report-daily-trend-summary-table td {
+  text-align: center !important;
+}
+
+.report-daily-trend-summary-table th:first-child,
+.report-daily-trend-summary-table td:first-child {
+  text-align: center !important;
+}
+
+.report-sheet-daily-trend-table .report-daily-trend-summary-table {
+  margin-bottom: 0;
+}
+
+.report-sheet-daily-trend-table-final .report-daily-trend-summary-table th,
+.report-sheet-daily-trend-table-final .report-daily-trend-summary-table td {
+  padding: 1.45mm 2mm;
+}
+
+.report-table,
+.report-table thead,
+.report-table tbody,
+.report-table tr,
+.report-table th,
+.report-table td {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* Daily Runs Trend report: medium first page charts + matching table cards */
+.report-sheet-daily-trend-combined {
+  padding-bottom: 16mm !important;
+}
+
+.report-daily-trend-first-page-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-card,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-card {
+  padding: 3.5mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-title-row,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-head {
+  margin-bottom: 2mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-title-row h4,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-head h4 {
+  font-size: 3.45mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-title-row p,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-head p {
+  font-size: 2.45mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-total-card,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-total {
+  min-width: 25mm;
+  padding: 2mm 3mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-total-card strong,
+.report-sheet-daily-trend-combined .report-daily-trend-pie-total strong {
+  font-size: 5.8mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-legend {
+  padding: 1.5mm 2mm;
+  gap: 1.4mm 2.8mm;
+  margin-bottom: 2mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-legend-item {
+  font-size: 2.05mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-chart {
+  height: 58mm;
+  margin-bottom: 0;
+  padding-top: 3mm;
+  padding-bottom: 3mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-y-axis,
+.report-sheet-daily-trend-combined .report-daily-trend-bar-wrap {
+  height: 48mm;
+}
+
+.report-sheet-daily-trend-combined .report-daily-trend-bar span {
+  font-size: 2mm;
+  min-width: 4.2mm;
+  height: 3.6mm;
+  margin-top: -4.3mm;
+}
+
+.report-daily-trend-pie-card,
+.report-daily-trend-distribution-card,
+.report-daily-trend-table-under-distribution {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 4mm;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 4mm;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+
+.report-daily-trend-pie-head,
+.report-daily-trend-distribution-head,
+.report-daily-trend-table-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4mm;
+  margin-bottom: 3mm;
+}
+
+.report-daily-trend-pie-head h4,
+.report-daily-trend-distribution-head h4,
+.report-daily-trend-table-section-head h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 3.6mm;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.report-daily-trend-pie-head p,
+.report-daily-trend-distribution-head p,
+.report-daily-trend-table-section-head p {
+  margin: 0.8mm 0 0;
+  color: #475569;
+  font-size: 2.55mm;
+  font-weight: 700;
+}
+
+.report-daily-trend-pie-total,
+.report-daily-trend-distribution-total {
+  min-width: 26mm;
+  border-radius: 3mm;
+  background: linear-gradient(135deg, #0f172a, #1e3a8a);
+  color: #ffffff;
+  padding: 2.2mm 3mm;
+  text-align: center;
+}
+
+.report-daily-trend-pie-total span,
+.report-daily-trend-distribution-total span {
+  display: block;
+  font-size: 2.25mm;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-daily-trend-pie-total strong,
+.report-daily-trend-distribution-total strong {
+  display: block;
+  margin-top: 0.8mm;
+  font-size: 6mm;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.report-daily-trend-pie-content {
+  display: grid;
+  grid-template-columns: 62mm 1fr;
+  align-items: center;
+  gap: 6mm;
+  min-height: 48mm;
+}
+
+.report-daily-trend-pie-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-daily-trend-pie-svg {
+  width: 54mm;
+  height: 54mm;
+  display: block;
+}
+
+.report-daily-trend-pie-total-text {
+  fill: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.report-daily-trend-pie-total-label {
+  fill: #64748b;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.report-daily-trend-pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2mm;
+}
+
+.report-daily-trend-pie-legend-item {
+  display: grid;
+  grid-template-columns: 3mm 1fr auto;
+  align-items: center;
+  gap: 2.4mm;
+  color: #334155;
+  font-size: 2.8mm;
+  font-weight: 800;
+}
+
+.report-daily-trend-pie-legend-dot,
+.report-daily-trend-case-dot {
+  width: 2.6mm;
+  height: 2.6mm;
+  border-radius: 999px;
+  display: inline-block;
+  border: 0.25mm solid rgba(15, 23, 42, 0.12);
+}
+
+.report-daily-trend-pie-legend-label {
+  color: #334155;
+}
+
+.report-daily-trend-pie-legend-value {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.report-sheet-daily-trend-distribution-page {
+  padding-bottom: 24mm;
+}
+
+.report-sheet-daily-trend-distribution-page .report-daily-trend-distribution-card {
+  margin-bottom: 4mm;
+  padding: 3.2mm;
+}
+
+.report-daily-trend-distribution-table {
+  table-layout: fixed;
+  margin-bottom: 0;
+}
+
+.report-daily-trend-distribution-table th,
+.report-daily-trend-distribution-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 1.55mm 1.8mm;
+}
+
+.report-daily-trend-distribution-table th:first-child,
+.report-daily-trend-distribution-table td:first-child {
+  width: 58%;
+  text-align: left !important;
+}
+
+.report-daily-trend-distribution-table th:nth-child(2),
+.report-daily-trend-distribution-table td:nth-child(2),
+.report-daily-trend-distribution-table th:nth-child(3),
+.report-daily-trend-distribution-table td:nth-child(3) {
+  width: 21%;
+  text-align: center !important;
+}
+
+.report-daily-trend-case-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 2mm;
+  font-weight: 800;
+  color: #163a5f;
+}
+
+.report-daily-trend-table-under-distribution {
+  margin-top: 4mm;
+  padding: 3.2mm;
+}
+
+.report-daily-trend-table-under-distribution-standalone {
+  margin-top: 0;
+}
+
+.report-sheet-daily-trend-table .report-daily-trend-table-under-distribution {
+  margin-top: 0;
+}
+
+.report-sheet-daily-trend-table .report-daily-trend-table-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4mm;
+  margin-bottom: 2.5mm;
+}
+
+.report-daily-trend-summary-table {
+  table-layout: fixed;
+  width: 100%;
+  margin-bottom: 0;
+  font-size: 2.55mm;
+}
+
+.report-daily-trend-summary-table th,
+.report-daily-trend-summary-table td {
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 1.25mm 1mm;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.report-daily-trend-summary-table th:first-child,
+.report-daily-trend-summary-table td:first-child {
+  width: 13mm;
+  text-align: center !important;
+  font-weight: 900;
+}
+
+.report-daily-trend-summary-table th:last-child,
+.report-daily-trend-summary-table td:last-child {
+  width: 14mm;
+  font-weight: 900 !important;
+}
+
+.report-daily-trend-summary-table thead th {
+  font-size: 2.25mm;
+  line-height: 1.15;
+}
+
+.report-daily-trend-table-under-distribution .report-daily-trend-summary-table th,
+.report-daily-trend-table-under-distribution .report-daily-trend-summary-table td {
+  padding: 1mm 0.85mm;
+  font-size: 2.25mm;
+}
+
+.report-daily-trend-table-under-distribution .report-daily-trend-summary-table thead th {
+  font-size: 2.05mm;
+}
+
+.report-sheet-daily-trend-table-final .report-daily-trend-summary-table th,
+.report-sheet-daily-trend-table-final .report-daily-trend-summary-table td {
+  padding: 1.1mm 0.95mm;
 }

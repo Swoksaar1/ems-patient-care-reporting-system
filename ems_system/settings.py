@@ -12,7 +12,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "django-insecure-3h-e8d*joknldgp9&8!rvonjof2)=c)zhy%*dxl$m^lpf-em-x"
 
-# Dev: set DJANGO_DEBUG=true
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = [
@@ -21,21 +20,8 @@ ALLOWED_HOSTS = [
     "192.168.136.90",
 ]
 
-# =========================
-# Storage path fix
-# =========================
+
 def get_installed_backend_dir():
-    """
-    Development:
-        Uses your project folder.
-
-    Packaged backend:
-        Uses the folder beside ems_backend.exe.
-
-    Important:
-        Do NOT use PyInstaller _MEI temp folder.
-        Electron will pass EMS_DB_PATH and EMS_MEDIA_ROOT.
-    """
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
 
@@ -72,9 +58,6 @@ MEDIA_ROOT = get_media_root()
 print(f"[EMS] Using SQLite DB: {SQLITE_DB_PATH}")
 print(f"[EMS] Using Media Root: {MEDIA_ROOT}")
 
-# =========================
-# Applications
-# =========================
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -93,7 +76,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    # "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -121,9 +103,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "ems_system.wsgi.application"
 
-# =========================
-# Database
-# =========================
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -131,9 +110,6 @@ DATABASES = {
     }
 }
 
-# =========================
-# Password validation
-# =========================
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -141,30 +117,18 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# =========================
-# Internationalization
-# =========================
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Manila"
 USE_I18N = True
 USE_TZ = True
 
-# =========================
-# Static files
-# =========================
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# =========================
-# Media files
-# =========================
 MEDIA_URL = "/media/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# =========================
-# DRF + JWT Auth
-# =========================
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -182,9 +146,6 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# =========================
-# CORS / CSRF
-# =========================
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [

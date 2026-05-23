@@ -90,6 +90,60 @@
   justify-content: flex-end;
 }
 
+.dash-month-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--dash-shadow-md);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.dash-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-filter-field label {
+  color: var(--dash-text-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.dash-filter-field select {
+  min-width: 122px;
+  min-height: 34px;
+  border: 1px solid rgba(103, 232, 249, 0.22);
+  border-radius: 12px;
+  padding: 0 34px 0 12px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07)),
+    #0b1522;
+  outline: none;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dash-filter-field select:focus {
+  border-color: rgba(103, 232, 249, 0.72);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+}
+
+.dash-filter-field option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
 .dash-btn {
   border: 1px solid transparent;
   border-radius: 16px;
@@ -129,7 +183,7 @@
 /* Stats */
 .dash-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 16px;
   margin: 16px 0 22px;
 }
@@ -219,6 +273,9 @@
   box-shadow: var(--dash-shadow-xl);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .dash-panel-head {
@@ -261,6 +318,14 @@
 .dash-grid-4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+  align-items: stretch;
+}
+
+.dash-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
   margin-bottom: 18px;
   align-items: stretch;
@@ -359,15 +424,16 @@
   left: 50%;
   bottom: calc(100% + 10px);
   transform: translateX(-50%) translateY(6px);
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: rgba(7, 17, 29, 0.96);
   border: 1px solid rgba(103, 232, 249, 0.22);
   color: #ffffff;
   font-size: 0.76rem;
   font-weight: 800;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
+  min-width: 180px;
   opacity: 0;
   pointer-events: none;
   transition:
@@ -388,6 +454,44 @@
   border-color: rgba(7, 17, 29, 0.96) transparent transparent transparent;
 }
 
+.dash-trend-tooltip-title {
+  font-weight: 900;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.dash-trend-tooltip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-trend-tooltip-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-trend-tooltip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.dash-trend-tooltip-type {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.dash-trend-tooltip-value {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.dash-trend-tooltip-empty {
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .dash-trend-bar-hitbox:hover .dash-trend-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
@@ -399,14 +503,46 @@
 }
 
 .dash-trend-bar {
+  position: relative;
   width: 100%;
   min-height: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
   border-radius: 999px 999px 6px 6px;
-  background: linear-gradient(180deg, #67e8f9 0%, #38bdf8 50%, #14b8a6 100%);
+  background: rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 24px rgba(34, 211, 238, 0.18);
   transition:
     filter 0.18s ease,
     box-shadow 0.18s ease;
+}
+
+.dash-trend-bar-stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+  height: 100%;
+}
+
+.dash-trend-segment {
+  width: 100%;
+  min-height: 2px;
+}
+
+.dash-trend-bar-count {
+  position: relative;
+  z-index: 2;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  user-select: none;
 }
 
 .dash-trend-label {
@@ -480,6 +616,7 @@
 /* Lists */
 .dash-list {
   padding: 8px 14px 14px;
+  flex: 1;
 }
 
 .dash-list-item {
@@ -624,7 +761,8 @@
   }
 
   .dash-grid-3,
-  .dash-grid-4 {
+  .dash-grid-4,
+  .dash-grid-bottom {
     grid-template-columns: 1fr;
   }
 }
@@ -642,6 +780,19 @@
   .dash-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .dash-month-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dash-filter-field {
+    flex: 1;
+  }
+
+  .dash-filter-field select {
+    width: 100%;
   }
 
   .dash-trend-label {
@@ -662,6 +813,11 @@
 @media (max-width: 560px) {
   .dash-stats {
     grid-template-columns: 1fr;
+  }
+
+  .dash-month-filter {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .dash-btn {

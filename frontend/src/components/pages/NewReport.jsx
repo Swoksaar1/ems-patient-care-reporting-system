@@ -25,6 +25,14 @@ const CASE_TYPES = [
   { label: "Back to Base", value: "back_to_base" },
 ];
 
+const CONNECTING_RUNS_OPTIONS = [
+  { label: "N/A", value: "na" },
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
+
+const AMBULANCE_BODY_OPTIONS = ["PTV 70102", "SND 2439", "SKA 1130", "City Ambu 6651"];
+
 const LOC_OPTIONS = [
   { label: "N/A", value: "na" },
   { label: "Awake", value: "awake" },
@@ -216,6 +224,81 @@ function militaryToApiDateTime(timeValue, dateValue) {
   return d.toISOString();
 }
 
+function militaryToApiTime(timeValue) {
+  if (!timeValue || timeValue === NA) return null;
+
+  const clean = normalizeMilitaryTimeInput(timeValue);
+
+  if (!isValidMilitaryTime(clean)) return null;
+
+  const hh = clean.slice(0, 2);
+  const mm = clean.slice(2, 4);
+
+  return `${hh}:${mm}:00`;
+}
+
+function MilitaryTimeField({ label, name, value, placeholder, disabled, onChange }) {
+  return (
+    <div className="nr-field">
+      <label>{label}</label>
+      <input
+        type="text"
+        inputMode="numeric"
+        name={name}
+        value={value}
+        onChange={(e) => onChange(name, e.target.value)}
+        placeholder={placeholder}
+        maxLength={4}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
+function normalizeFacilityName(value) {
+  const raw = String(value || "").trim();
+
+  const text = raw
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\./g, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "";
+
+  const stJudeAliases = [
+    "SJTGH",
+    "ST JUDE",
+    "ST JUDE HOSPITAL",
+    "ST JUDE THADDEUS GENERAL HOSPITAL",
+    "SAINT JUDE",
+    "SAINT JUDE HOSPITAL",
+    "SAINT JUDE THADDEUS GENERAL HOSPITAL",
+  ];
+
+  if (stJudeAliases.includes(text)) {
+    return "St. Jude";
+  }
+
+  const hospitalToHomeAliases = [
+    "HOME",
+    "HOSPITAL TO HOME",
+    "HOSPITAL HOME",
+    "TRANSPORT TO HOME",
+    "DISCHARGE TO HOME",
+    "FROM HOSPITAL TO HOME",
+  ];
+
+  if (hospitalToHomeAliases.includes(text)) {
+    return "Hospital to Home";
+  }
+
+  return raw;
+}
+
 async function readResponseBody(res) {
   const contentType = res.headers.get("content-type") || "";
 
@@ -344,6 +427,7 @@ function NewReport() {
     age: "",
     sex: NA,
     case_type: "medical",
+    connecting_runs: NA,
     chief_complaint: "",
     assessment: "",
   });
@@ -363,6 +447,7 @@ function NewReport() {
     arrived_scene_time: "",
     left_scene_time: "",
     arrived_hospital_time: "",
+    left_hospital_time: "",
     back_in_service_time: "",
     intervention_notes: "",
   });
@@ -541,6 +626,7 @@ function NewReport() {
       age: "",
       sex: NA,
       case_type: "medical",
+      connecting_runs: NA,
       chief_complaint: "",
       assessment: "",
     });
@@ -560,6 +646,7 @@ function NewReport() {
       arrived_scene_time: "",
       left_scene_time: "",
       arrived_hospital_time: "",
+      left_hospital_time: "",
       back_in_service_time: "",
       intervention_notes: "",
     });
@@ -631,11 +718,13 @@ function NewReport() {
 
   const validateIncidentMilitaryTimes = () => {
     const fields = [
+      { key: "toi", label: "TOI" },
       { key: "call_received_time", label: "Call Received" },
       { key: "responded_time", label: "Responded" },
       { key: "arrived_scene_time", label: "Arrived Scene" },
       { key: "left_scene_time", label: "Left Scene" },
       { key: "arrived_hospital_time", label: "Arrived Hospital" },
+      { key: "left_hospital_time", label: "Left Hospital" },
       { key: "back_in_service_time", label: "Back In Service" },
     ];
 
@@ -684,8 +773,9 @@ function NewReport() {
       ...incident,
       ambulance_body_no: incident.ambulance_body_no?.trim() || "",
       case_no: incident.case_no?.trim() || "",
+      toi: militaryToApiTime(incident.toi),
       patient_location: incident.patient_location?.trim() || "",
-      transported_to: incident.transported_to?.trim() || "",
+      transported_to: normalizeFacilityName(incident.transported_to),
       level_of_consciousness:
         incident.level_of_consciousness === NA ? "" : incident.level_of_consciousness || "",
       poi: incident.poi?.trim() || "",
@@ -696,6 +786,7 @@ function NewReport() {
       arrived_scene_time: militaryToApiDateTime(incident.arrived_scene_time, incident.doi),
       left_scene_time: militaryToApiDateTime(incident.left_scene_time, incident.doi),
       arrived_hospital_time: militaryToApiDateTime(incident.arrived_hospital_time, incident.doi),
+      left_hospital_time: militaryToApiDateTime(incident.left_hospital_time, incident.doi),
       back_in_service_time: militaryToApiDateTime(incident.back_in_service_time, incident.doi),
     };
 
@@ -718,6 +809,7 @@ function NewReport() {
 
     const payload = {
       case_type: patient.case_type || "medical",
+      connecting_runs: patient.connecting_runs === NA ? "" : patient.connecting_runs || "",
 
       patient: {
         full_name: patient.full_name?.trim() || "",
@@ -725,6 +817,7 @@ function NewReport() {
         age: patient.age?.trim() || "",
         sex: patient.sex || NA,
         case_type: patient.case_type || "medical",
+        connecting_runs: patient.connecting_runs === NA ? "" : patient.connecting_runs || "",
         chief_complaint: patient.chief_complaint?.trim() || "",
         assessment: patient.assessment?.trim() || "",
       },
@@ -742,6 +835,7 @@ function NewReport() {
       arrived_scene_time: incidentForApi.arrived_scene_time,
       left_scene_time: incidentForApi.left_scene_time,
       arrived_hospital_time: incidentForApi.arrived_hospital_time,
+      left_hospital_time: incidentForApi.left_hospital_time,
       back_in_service_time: incidentForApi.back_in_service_time,
       intervention_notes: incidentForApi.intervention_notes,
 
@@ -893,7 +987,7 @@ function NewReport() {
                   />
                 </div>
 
-                <div className="nr-field">
+                <div className="nr-field nr-quarter">
                   <label>Age</label>
                   <input
                     type="text"
@@ -907,7 +1001,7 @@ function NewReport() {
                   />
                 </div>
 
-                <div className="nr-field">
+                <div className="nr-field nr-quarter">
                   <label>Sex</label>
                   <select name="sex" value={patient.sex} onChange={updatePatient} disabled={saving}>
                     <option value={NA}>N/A</option>
@@ -916,7 +1010,7 @@ function NewReport() {
                   </select>
                 </div>
 
-                <div className="nr-field">
+                <div className="nr-field nr-quarter">
                   <label>Case Type</label>
                   <select
                     name="case_type"
@@ -925,6 +1019,22 @@ function NewReport() {
                     disabled={saving}
                   >
                     {CASE_TYPES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="nr-field nr-quarter">
+                  <label>Connecting Runs</label>
+                  <select
+                    name="connecting_runs"
+                    value={patient.connecting_runs}
+                    onChange={updatePatient}
+                    disabled={saving}
+                  >
+                    {CONNECTING_RUNS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -998,13 +1108,19 @@ function NewReport() {
               <div className="nr-grid">
                 <div className="nr-field">
                   <label>Ambulance Body No</label>
-                  <input
+                  <select
                     name="ambulance_body_no"
                     value={incident.ambulance_body_no}
                     onChange={updateIncident}
-                    placeholder="e.g. Ambu 1..."
                     disabled={saving}
-                  />
+                  >
+                    <option value="">Select Ambulance</option>
+                    {AMBULANCE_BODY_OPTIONS.map((ambulance) => (
+                      <option key={ambulance} value={ambulance}>
+                        {ambulance}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="nr-field">
@@ -1067,16 +1183,14 @@ function NewReport() {
                   />
                 </div>
 
-                <div className="nr-field">
-                  <label>TOI (Time)</label>
-                  <input
-                    type="time"
-                    name="toi"
-                    value={incident.toi}
-                    onChange={updateIncident}
-                    disabled={saving}
-                  />
-                </div>
+                <MilitaryTimeField
+                  label="TOI (Time)"
+                  name="toi"
+                  value={incident.toi}
+                  placeholder="0000"
+                  disabled={saving}
+                  onChange={updateIncidentMilitaryTime}
+                />
 
                 <div className="nr-field nr-full">
                   <label>POI (Place)</label>
@@ -1098,101 +1212,25 @@ function NewReport() {
                   />
                 </div>
 
-                <div className="nr-field">
-                  <label>Call Received</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="call_received_time"
-                    value={incident.call_received_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("call_received_time", e.target.value)
-                    }
-                    placeholder="0000"
-                    maxLength={4}
+                {[
+                  { label: "Call Received", name: "call_received_time", placeholder: "0000" },
+                  { label: "Responded", name: "responded_time", placeholder: "0100" },
+                  { label: "Arrived Scene", name: "arrived_scene_time", placeholder: "0200" },
+                  { label: "Left Scene", name: "left_scene_time", placeholder: "0300" },
+                  { label: "Arrived Hospital", name: "arrived_hospital_time", placeholder: "0400" },
+                  { label: "Left Hospital", name: "left_hospital_time", placeholder: "0500" },
+                  { label: "Back In Service", name: "back_in_service_time", placeholder: "0600" },
+                ].map((field) => (
+                  <MilitaryTimeField
+                    key={field.name}
+                    label={field.label}
+                    name={field.name}
+                    value={incident[field.name]}
+                    placeholder={field.placeholder}
                     disabled={saving}
+                    onChange={updateIncidentMilitaryTime}
                   />
-                </div>
-
-                <div className="nr-field">
-                  <label>Responded</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="responded_time"
-                    value={incident.responded_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("responded_time", e.target.value)
-                    }
-                    placeholder="0100"
-                    maxLength={4}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Arrived Scene</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="arrived_scene_time"
-                    value={incident.arrived_scene_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("arrived_scene_time", e.target.value)
-                    }
-                    placeholder="0200"
-                    maxLength={4}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Left Scene</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="left_scene_time"
-                    value={incident.left_scene_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("left_scene_time", e.target.value)
-                    }
-                    placeholder="0300"
-                    maxLength={4}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Arrived Hospital</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="arrived_hospital_time"
-                    value={incident.arrived_hospital_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("arrived_hospital_time", e.target.value)
-                    }
-                    placeholder="0400"
-                    maxLength={4}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="nr-field">
-                  <label>Back In Service</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="back_in_service_time"
-                    value={incident.back_in_service_time}
-                    onChange={(e) =>
-                      updateIncidentMilitaryTime("back_in_service_time", e.target.value)
-                    }
-                    placeholder="0500"
-                    maxLength={4}
-                    disabled={saving}
-                  />
-                </div>
+                ))}
 
                 <div className="nr-field nr-full">
                   <label>Intervention Notes</label>

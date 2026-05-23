@@ -34,7 +34,7 @@ export default function LoginModal({ open, onClose, onSuccess }) {
 
     const payload = {
       username: cleanUsername,
-      password, // do NOT trim password
+      password,
     };
 
     try {

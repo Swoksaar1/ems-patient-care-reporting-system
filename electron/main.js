@@ -40,10 +40,8 @@ function copyDirIfMissing(srcDir, destDir) {
 
     if (entry.isDirectory()) {
       copyDirIfMissing(src, dest);
-    } else {
-      if (!fs.existsSync(dest)) {
-        fs.copyFileSync(src, dest);
-      }
+    } else if (!fs.existsSync(dest)) {
+      fs.copyFileSync(src, dest);
     }
   }
 }
@@ -52,26 +50,20 @@ function getProjectRoot() {
   return path.join(__dirname, "..");
 }
 
-function getInstallDir() {
+function getLiveDataDir() {
   if (isDev) {
     return getProjectRoot();
   }
 
-  /*
-    Installed app folder:
-    C:\Users\YOUR_NAME\AppData\Local\Programs\EMS Patient Care Reporting System
-
-    This is where the LIVE db.sqlite3 will be saved.
-  */
-  return path.dirname(process.execPath);
+  return app.getPath("userData");
 }
 
 function getLiveDbPath() {
-  return path.join(getInstallDir(), "db.sqlite3");
+  return path.join(getLiveDataDir(), "db.sqlite3");
 }
 
 function getLiveMediaRoot() {
-  return path.join(getInstallDir(), "media");
+  return path.join(getLiveDataDir(), "media");
 }
 
 function prepareLiveStorage() {
@@ -82,10 +74,6 @@ function prepareLiveStorage() {
   ensureDir(liveMediaRoot);
 
   if (!isDev) {
-    /*
-      Seed files are read-only packaged copies.
-      They are copied only once if the live files do not exist yet.
-    */
     const seedDbPath = path.join(process.resourcesPath, "seed", "db.sqlite3");
     const seedMediaDir = path.join(process.resourcesPath, "seed", "media");
 
@@ -112,7 +100,26 @@ function getFrontendIndexPath() {
     return path.join(getProjectRoot(), "frontend", "build", "index.html");
   }
 
-  return path.join(process.resourcesPath, "app.asar", "frontend", "build", "index.html");
+  const extraResourcesPath = path.join(
+    process.resourcesPath,
+    "frontend",
+    "build",
+    "index.html"
+  );
+
+  const asarPath = path.join(
+    process.resourcesPath,
+    "app.asar",
+    "frontend",
+    "build",
+    "index.html"
+  );
+
+  if (fs.existsSync(extraResourcesPath)) {
+    return extraResourcesPath;
+  }
+
+  return asarPath;
 }
 
 function getIconPath() {
@@ -120,7 +127,24 @@ function getIconPath() {
     return path.join(getProjectRoot(), "electron", "icon.ico");
   }
 
-  return path.join(process.resourcesPath, "app.asar", "electron", "icon.ico");
+  const extraResourcesIcon = path.join(
+    process.resourcesPath,
+    "electron",
+    "icon.ico"
+  );
+
+  const asarIcon = path.join(
+    process.resourcesPath,
+    "app.asar",
+    "electron",
+    "icon.ico"
+  );
+
+  if (fs.existsSync(extraResourcesIcon)) {
+    return extraResourcesIcon;
+  }
+
+  return asarIcon;
 }
 
 function getPythonPath() {
@@ -186,7 +210,7 @@ function startBackend() {
   console.log("[Backend] LIVE DB:", liveDbPath);
   console.log("[Backend] LIVE MEDIA:", liveMediaRoot);
   console.log("[Backend] resourcesPath:", process.resourcesPath);
-  console.log("[Backend] installDir:", getInstallDir());
+  console.log("[Backend] liveDataDir:", getLiveDataDir());
 
   backendProcess = spawn(command, args, {
     cwd,

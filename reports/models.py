@@ -44,6 +44,20 @@ class Report(models.Model):
         ("back_to_base", "Back to Base"),
     ]
 
+    CONNECTING_RUNS_CHOICES = [
+        ("na", "N/A"),
+        ("yes", "Yes"),
+        ("no", "No"),
+    ]
+
+    AMBULANCE_BODY_CHOICES = [
+        ("", "Select Ambulance"),
+        ("PTV 70102", "PTV 70102"),
+        ("SND 2439", "SND 2439"),
+        ("SKA 1130", "SKA 1130"),
+        ("City Ambu 6651", "City Ambu 6651"),
+    ]
+
     patient = models.ForeignKey(
         Patient,
         on_delete=models.CASCADE,
@@ -51,11 +65,22 @@ class Report(models.Model):
     )
 
     case_no = models.CharField(max_length=100, blank=True, default="")
-    ambulance_body_no = models.CharField(max_length=60, blank=True, default="")
+    ambulance_body_no = models.CharField(
+        max_length=60,
+        choices=AMBULANCE_BODY_CHOICES,
+        blank=True,
+        default="",
+    )
     case_type = models.CharField(
         max_length=30,
         choices=CASE_TYPE_CHOICES,
         default="medical",
+        blank=True,
+    )
+    connecting_runs = models.CharField(
+        max_length=10,
+        choices=CONNECTING_RUNS_CHOICES,
+        default="na",
         blank=True,
     )
 
@@ -72,6 +97,7 @@ class Report(models.Model):
     arrived_scene_time = models.DateTimeField(null=True, blank=True)
     left_scene_time = models.DateTimeField(null=True, blank=True)
     arrived_hospital_time = models.DateTimeField(null=True, blank=True)
+    left_hospital_time = models.DateTimeField(null=True, blank=True)
     back_in_service_time = models.DateTimeField(null=True, blank=True)
 
     intervention_notes = models.TextField(blank=True, default="")

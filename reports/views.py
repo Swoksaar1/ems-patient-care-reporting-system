@@ -32,6 +32,7 @@ DATETIME_FIELDS = {
     "arrived_scene_time",
     "left_scene_time",
     "arrived_hospital_time",
+    "left_hospital_time",
     "back_in_service_time",
     "time",  # used inside vitals
 }

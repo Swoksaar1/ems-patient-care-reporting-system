@@ -19,6 +19,46 @@ const CASE_TYPE_OPTIONS = [
   { label: "Back to Base", value: "back_to_base" },
 ];
 
+const CONNECTING_RUNS_OPTIONS = [
+  { label: "N/A", value: NA },
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
+
+const AMBULANCE_BODY_OPTIONS = [
+  { label: "Select Ambulance", value: "" },
+  { label: "PTV 70102", value: "PTV 70102" },
+  { label: "SND 2439", value: "SND 2439" },
+  { label: "SKA 1130", value: "SKA 1130" },
+  { label: "City Ambu 6651", value: "City Ambu 6651" },
+];
+
+const MONTH_OPTIONS = [
+  { label: "January", value: "1" },
+  { label: "February", value: "2" },
+  { label: "March", value: "3" },
+  { label: "April", value: "4" },
+  { label: "May", value: "5" },
+  { label: "June", value: "6" },
+  { label: "July", value: "7" },
+  { label: "August", value: "8" },
+  { label: "September", value: "9" },
+  { label: "October", value: "10" },
+  { label: "November", value: "11" },
+  { label: "December", value: "12" },
+];
+
+function getReportMonth(r) {
+  const rawDate = r?.doi || r?.incident?.doi || "";
+
+  if (!rawDate) return "";
+
+  const normalizedDate = normalizeDateForDRF(rawDate);
+  if (!normalizedDate) return "";
+
+  return String(Number(normalizedDate.slice(5, 7)));
+}
+
 const SEX_OPTIONS = [
   { label: "N/A", value: NA },
   { label: "Male", value: "male" },
@@ -156,6 +196,112 @@ const NON_TRANSPORT_REASON_OPTIONS = [
   { label: "medical clearance not granted", value: "medical_clearance_not_granted" },
 ];
 
+
+const CLASSIFICATION_SEARCH_MEDICAL_ALIASES = {
+  "Abdominal Pain": ["Abdominal P"],
+  "Alcohol Intoxication": ["Alcohol Intx"],
+  "Allergic Reaction": ["Alergic Reaction", "Allergic Reaction"],
+  "Bronchial Asthma": ["BA"],
+  Cellulitis: ["Cellulities", "Cellulitis"],
+  "Difficult Urination": ["Dif. Urination"],
+  "Difficulty of Breathing": [
+    "DOB",
+    "Difficult of Breathing",
+    "Difficulty of Breathing",
+    "Difficulty Breathing",
+  ],
+  "Epigastric Pain": ["Epigastric P"],
+  Hemoptysis: ["Hemoptisis", "Hemoptysis"],
+  Hypertension: ["HPN"],
+  "Loose Bowel Movement": ["LBM"],
+  "Loss of Consciousness": [
+    "LOC",
+    "Lost of Consciousness",
+    "Loss of Consciousness",
+  ],
+  "Muscle Rigidity": ["Muscle Regidity", "Muscle Rigidity"],
+  Obstetrics: ["OB"],
+};
+
+const CLASSIFICATION_SEARCH_TRAUMA_ALIASES = {
+  "2X2 V/A or 2X2 Vehicle Accident": [
+    "2X2 V/A",
+    "2X2 Vehicle Accident",
+    "2X2 VA",
+    "2X2 Vehicular Accident",
+  ],
+  "4X2 V/A or 4X2 Vehicle Accident": [
+    "4X2 V/A",
+    "4X2 Vehicle Accident",
+    "4X2 VA",
+    "4X2 Vehicular Accident",
+  ],
+  "4X4 V/A or 4X4 Vehicle Accident": [
+    "4X4 V/A",
+    "4X4 Vehicle Accident",
+    "4X4 VA",
+    "4X4 Vehicular Accident",
+  ],
+  "Possible Breath of Alcohol": [
+    "Possible Breath of Alcohol",
+    "Breath of Alcohol",
+    "Possible Alcohol Breath",
+    "Alcohol Breath",
+    "PBOA",
+  ],
+  Electrocuted: ["Electricuted", "Electrocuted"],
+  "Hit and Run": ["Hit & Run"],
+  "Insect and Animal Bites": ["I & A Bites"],
+  "Pedestrian Accident": [
+    "Pedistrian Accident",
+    "Pedestrian Accident",
+    "Pedestrian Acc",
+  ],
+  "Single Accident": ["Single Acc"],
+  Stoning: ["Stonning", "Stoning"],
+};
+
+
+
+function normalizeClassificationSearchText(value) {
+  return String(value || "")
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\./g, "")
+    .replace(/-/g, " ")
+    .replace(/_/g, " ")
+    .replace(/[^A-Z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildClassificationSearchText(value, aliasGroups = []) {
+  const raw = String(value || "").trim();
+  const normalizedRaw = normalizeClassificationSearchText(raw);
+
+  if (!normalizedRaw) return "";
+
+  const matched = [];
+
+  aliasGroups.forEach((aliases) => {
+    Object.entries(aliases).forEach(([label, values]) => {
+      const possible = [label, ...(values || [])];
+
+      if (
+        possible.some((item) => {
+          const normalizedItem = normalizeClassificationSearchText(item);
+          return normalizedItem && normalizedRaw === normalizedItem;
+        })
+      ) {
+        matched.push(label, ...possible);
+      }
+    });
+  });
+
+  return [raw, ...matched].join(" ").toLowerCase();
+}
+
 const EMPTY_VITALS_ROW = {
   time: "",
   bp: "",
@@ -177,7 +323,8 @@ const INCIDENT_TIME_FIELDS = [
   { key: "arrived_scene_time", label: "Arrived Scene", placeholder: "0200" },
   { key: "left_scene_time", label: "Left Scene", placeholder: "0300" },
   { key: "arrived_hospital_time", label: "Arrived Hospital", placeholder: "0400" },
-  { key: "back_in_service_time", label: "Back In Service", placeholder: "0500" },
+  { key: "left_hospital_time", label: "Left Hospital", placeholder: "0500" },
+  { key: "back_in_service_time", label: "Back In Service", placeholder: "0600" },
 ];
 
 function Skeleton({ className = "", style }) {
@@ -194,6 +341,7 @@ function SkeletonRow() {
       <td><Skeleton className="skel-line skel-sm" style={{ width: 120 }} /></td>
       <td><Skeleton className="skel-line skel-sm" style={{ width: 160 }} /></td>
       <td><Skeleton className="skel-line skel-sm" style={{ width: 120 }} /></td>
+      <td><Skeleton className="skel-line skel-sm" style={{ width: 110 }} /></td>
       <td><Skeleton className="skel-line skel-sm" style={{ width: 120 }} /></td>
       <td className="rp-actions">
         <Skeleton className="skel-pill" style={{ width: 56, height: 28 }} />
@@ -232,6 +380,7 @@ function PatientsSkeleton() {
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 60 }} /></th>
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 120 }} /></th>
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 90 }} /></th>
+                  <th><Skeleton className="skel-line skel-sm" style={{ width: 110 }} /></th>
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 100 }} /></th>
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 70 }} /></th>
                   <th><Skeleton className="skel-line skel-sm" style={{ width: 70 }} /></th>
@@ -362,6 +511,11 @@ function timeFromApiToMilitary(val) {
   return "";
 }
 
+function formatMilitaryTimeWithH(val) {
+  const military = timeFromApiToMilitary(val);
+  return military ? `${military}H` : "";
+}
+
 function militaryToApiDateTime(timeValue, dateValue) {
   if (!timeValue || timeValue === NA) return null;
 
@@ -480,6 +634,41 @@ function formatCaseTypeLabel(value) {
   return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
 }
 
+function getConnectingRunsValue(report) {
+  return (
+    report?.connecting_runs ??
+    report?.connectingRuns ??
+    report?.patient?.connecting_runs ??
+    report?.patient?.connectingRuns ??
+    report?.incident?.connecting_runs ??
+    report?.incident?.connectingRuns ??
+    NA
+  );
+}
+
+function normalizeConnectingRunsForPayload(value) {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+
+  const text = String(value || "").trim().toLowerCase();
+
+  if (!text || text === NA || text === "n/a" || text === "none") return NA;
+  if (text === "yes" || text === "y" || text === "true" || text === "1") return "yes";
+  if (text === "no" || text === "n" || text === "false" || text === "0") return "no";
+
+  return text;
+}
+
+function formatConnectingRunsLabel(value) {
+  const normalized = normalizeConnectingRunsForPayload(value);
+
+  if (!normalized || normalized === NA) return "N/A";
+  if (normalized === "yes") return "Yes";
+  if (normalized === "no") return "No";
+
+  return capitalizeFirstLetter(String(normalized).replace(/_/g, " "));
+}
+
 function formatSexDisplay(value) {
   if (!value || value === NA) return "";
   const s = String(value);
@@ -523,21 +712,30 @@ function InputKV({
   type = "text",
   inputMode,
   maxLength,
+  suffix = "",
 }) {
   return (
     <div className="rp-kv">
       <div className="rp-k">{label}</div>
-      <div className="rp-v">
-        <input
-          className="rp-input"
-          type={type}
-          inputMode={inputMode}
-          maxLength={maxLength}
-          value={value === undefined || value === null ? "" : value}
-          placeholder={placeholder || ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </div>
+<div className="rp-v">
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <input
+      className="rp-input"
+      type={type}
+      inputMode={inputMode}
+      maxLength={maxLength}
+      value={value === undefined || value === null ? "" : value}
+      placeholder={placeholder || ""}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ flex: 1 }}
+    />
+    {suffix ? (
+      <span style={{ fontWeight: 800, color: "#64748b", letterSpacing: "0.04em" }}>
+        {suffix}
+      </span>
+    ) : null}
+  </div>
+</div>
     </div>
   );
 }
@@ -606,10 +804,18 @@ function getAttachmentFileName(path) {
 
 function normalizeTimeForDRF(val) {
   if (val === null || val === undefined) return null;
+
   const s = String(val).trim();
   if (!s) return null;
 
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(s)) return s;
+  const military = normalizeMilitaryTimeInput(s);
+  if (/^\d{4}$/.test(military) && isValidMilitaryTime(military)) {
+    return `${military.slice(0, 2)}:${military.slice(2, 4)}:00`;
+  }
+
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    return s.length === 5 ? `${s}:00` : s;
+  }
 
   const isoLike = s.match(/^(\d{2}:\d{2}:\d{2})/);
   if (isoLike) return isoLike[1];
@@ -625,7 +831,8 @@ function normalizeTimeForDRF(val) {
     } else {
       if (hh !== 12) hh += 12;
     }
-    return `${String(hh).padStart(2, "0")}:${mm}`;
+
+    return `${String(hh).padStart(2, "0")}:${mm}:00`;
   }
 
   return null;
@@ -677,6 +884,50 @@ function cleanVitals(arr) {
     .map((v) => cleanObject(v));
 }
 
+function normalizeFacilityName(value) {
+  const raw = String(value || "").trim();
+
+  const text = raw
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\./g, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "";
+
+  const stJudeAliases = [
+    "SJTGH",
+    "ST JUDE",
+    "ST JUDE HOSPITAL",
+    "ST JUDE THADDEUS GENERAL HOSPITAL",
+    "SAINT JUDE",
+    "SAINT JUDE HOSPITAL",
+    "SAINT JUDE THADDEUS GENERAL HOSPITAL",
+  ];
+
+  if (stJudeAliases.includes(text)) {
+    return "St. Jude";
+  }
+
+  const hospitalToHomeAliases = [
+    "HOME",
+    "HOSPITAL TO HOME",
+    "HOSPITAL HOME",
+    "TRANSPORT TO HOME",
+    "DISCHARGE TO HOME",
+    "FROM HOSPITAL TO HOME",
+  ];
+
+  if (hospitalToHomeAliases.includes(text)) {
+    return "Hospital to Home";
+  }
+
+  return raw;
+}
+
 function buildReportPatchPayload(selected) {
   const inc = safeObj(selected?.incident);
   const p = safeObj(getPatientObj(selected));
@@ -685,6 +936,7 @@ function buildReportPatchPayload(selected) {
   const payload = {
     case_no: selected?.case_no ?? "",
     case_type: selected?.case_type ?? "",
+    connecting_runs: normalizeConnectingRunsForPayload(getConnectingRunsValue(selected)),
 
     patient: {
       full_name: p.full_name ?? "",
@@ -699,7 +951,7 @@ function buildReportPatchPayload(selected) {
 
     ambulance_body_no: selected?.ambulance_body_no ?? "",
     patient_location: selected?.patient_location ?? "",
-    transported_to: selected?.transported_to ?? "",
+    transported_to: normalizeFacilityName(selected?.transported_to),
 
     doi: normalizeDateForDRF(selected?.doi ?? inc?.doi),
     toi: normalizeTimeForDRF(selected?.toi ?? inc?.toi),
@@ -712,6 +964,7 @@ function buildReportPatchPayload(selected) {
     arrived_scene_time: reportTimeToPayload(selected?.arrived_scene_time, incidentDate),
     left_scene_time: reportTimeToPayload(selected?.left_scene_time, incidentDate),
     arrived_hospital_time: reportTimeToPayload(selected?.arrived_hospital_time, incidentDate),
+    left_hospital_time: reportTimeToPayload(selected?.left_hospital_time, incidentDate),
     back_in_service_time: reportTimeToPayload(selected?.back_in_service_time, incidentDate),
 
     intervention_notes: selected?.intervention_notes ?? "",
@@ -849,6 +1102,9 @@ function buildExcelImportPayload(row) {
   return {
     case_no: String(getExcelValue(row, ["Case No", "Case Number", "Case #"]) || "").trim(),
     case_type: caseType,
+    connecting_runs: normalizeConnectingRunsForPayload(
+      getExcelValue(row, ["Connecting Runs", "Connecting Run", "Connecting", "Connected Runs"])
+    ),
     ambulance_body_no: String(
       getExcelValue(row, ["Ambulance", "Ambulance Body No", "Ambulance Body Number"]) || ""
     ).trim(),
@@ -873,9 +1129,9 @@ function buildExcelImportPayload(row) {
     patient_location: String(
       getExcelValue(row, ["Location", "Patient Location", "Scene Location"]) || ""
     ).trim(),
-    transported_to: String(
-      getExcelValue(row, ["Transported To", "Hospital", "Facility"]) || ""
-    ).trim(),
+    transported_to: normalizeFacilityName(
+      getExcelValue(row, ["Transported To", "Hospital", "Facility"])
+    ),
 
     doi,
     toi,
@@ -900,6 +1156,10 @@ function buildExcelImportPayload(row) {
     ),
     arrived_hospital_time: excelTimeToApiDateTime(
       getExcelValue(row, ["Arrived Hospital", "Arrived Hospital Time"]),
+      doi
+    ),
+    left_hospital_time: excelTimeToApiDateTime(
+      getExcelValue(row, ["Left Hospital", "Left Hospital Time"]),
       doi
     ),
     back_in_service_time: excelTimeToApiDateTime(
@@ -931,7 +1191,6 @@ export default function Patients() {
   const [deletingId, setDeletingId] = useState(null);
   const [importingExcel, setImportingExcel] = useState(false);
   const excelInputRef = useRef(null);
-
   const confirmResolverRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("Confirm");
@@ -1000,6 +1259,7 @@ export default function Patients() {
   const [reports, setReports] = useState([]);
   const [search, setSearch] = useState("");
   const [caseTypeFilter, setCaseTypeFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -1132,9 +1392,13 @@ export default function Patients() {
 
     return (reports || []).filter((r) => {
       const reportCaseType = String(r.case_type || "").trim().toLowerCase();
+      const reportMonth = getReportMonth(r);
+      const connectingRuns = String(formatConnectingRunsLabel(getConnectingRunsValue(r))).toLowerCase();
 
       const matchCaseType =
         caseTypeFilter === "all" ? true : reportCaseType === caseTypeFilter.toLowerCase();
+
+      const matchMonth = monthFilter === "all" ? true : reportMonth === monthFilter;
 
       const caseNoDisplay = String(getCaseNo(r)).toLowerCase();
       const patientName = String(formatNameFromReport(r)).toLowerCase();
@@ -1143,6 +1407,18 @@ export default function Patients() {
       const location = String(r.patient_location || "").toLowerCase();
       const patientAge = String(getPatientObj(r)?.age || "").toLowerCase();
       const assessment = String(getPatientObj(r)?.assessment || "").toLowerCase();
+      const moi = String(r.moi || r?.incident?.moi || "").toLowerCase();
+
+      const chiefSyncedSearch = buildClassificationSearchText(getChiefComplaintFromReport(r), [
+        CLASSIFICATION_SEARCH_MEDICAL_ALIASES,
+      ]);
+      const moiSyncedSearch = buildClassificationSearchText(r.moi || r?.incident?.moi || "", [
+        CLASSIFICATION_SEARCH_TRAUMA_ALIASES,
+      ]);
+      const assessmentSyncedSearch = buildClassificationSearchText(getPatientObj(r)?.assessment || "", [
+        CLASSIFICATION_SEARCH_MEDICAL_ALIASES,
+        CLASSIFICATION_SEARCH_TRAUMA_ALIASES,
+      ]);
 
       const matchSearch =
         !s ||
@@ -1150,14 +1426,19 @@ export default function Patients() {
         patientName.includes(s) ||
         amb.includes(s) ||
         chief.includes(s) ||
+        chiefSyncedSearch.includes(s) ||
         reportCaseType.includes(s) ||
+        connectingRuns.includes(s) ||
         location.includes(s) ||
         patientAge.includes(s) ||
-        assessment.includes(s);
+        assessment.includes(s) ||
+        assessmentSyncedSearch.includes(s) ||
+        moi.includes(s) ||
+        moiSyncedSearch.includes(s);
 
-      return matchCaseType && matchSearch;
+      return matchCaseType && matchMonth && matchSearch;
     });
-  }, [reports, search, caseTypeFilter]);
+  }, [reports, search, caseTypeFilter, monthFilter]);
 
   const fetchReportDetail = async (id) => {
     const API_BASE = getApiBase();
@@ -1327,6 +1608,7 @@ export default function Patients() {
           "arrived_scene_time",
           "left_scene_time",
           "arrived_hospital_time",
+          "left_hospital_time",
           "back_in_service_time",
           "intervention_notes",
           "level_of_consciousness",
@@ -1412,7 +1694,12 @@ export default function Patients() {
   };
 
   const validateSelectedMilitaryTimes = () => {
-    for (const field of INCIDENT_TIME_FIELDS) {
+    const fields = [
+      { key: "toi", label: "TOI" },
+      ...INCIDENT_TIME_FIELDS,
+    ];
+
+    for (const field of fields) {
       const raw = selected?.[field.key];
 
       if (!raw) continue;
@@ -2221,6 +2508,19 @@ export default function Patients() {
                     </option>
                   ))}
                 </select>
+
+                <select
+                  className="rp-input"
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                >
+                  <option value="all">All Months</option>
+                  {MONTH_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -2237,6 +2537,7 @@ export default function Patients() {
                     <th>Age</th>
                     <th>Chief Complaint</th>
                     <th>Case Type</th>
+                    <th>Connecting Runs</th>
                     <th>Location</th>
                     <th>Ambulance</th>
                     <th>Date</th>
@@ -2247,7 +2548,7 @@ export default function Patients() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="rp-empty">No patients found.</td>
+                      <td colSpan="10" className="rp-empty">No patients found.</td>
                     </tr>
                   ) : (
                     filtered.map((r) => {
@@ -2262,9 +2563,10 @@ export default function Patients() {
                           <td>{pRow.age || "—"}</td>
                           <td className="rp-complaint">{chiefComplaint || "—"}</td>
                           <td>{formatCaseTypeLabel(r.case_type)}</td>
+                          <td>{formatConnectingRunsLabel(getConnectingRunsValue(r))}</td>
                           <td>{r.patient_location || "—"}</td>
                           <td className="rp-mono">{r.ambulance_body_no || "—"}</td>
-                          <td>{formatDateTimeReadable(r.created_at || r.call_received_time) || "—"}</td>
+                          <td>{formatDateReadable(r.doi || r.incident?.doi) || "—"}</td>
                           <td className="rp-actions">
                             <button className="rp-mini rp-view" onClick={() => openModal(r, "view")}>
                               View
@@ -2488,15 +2790,31 @@ export default function Patients() {
                                 onChange={(v) => updateSelected("case_type", v)}
                                 options={CASE_TYPE_OPTIONS}
                               />
-                              <InputKV
+                              <SelectKV
+                                label="Connecting Runs"
+                                value={normalizeConnectingRunsForPayload(getConnectingRunsValue(selected))}
+                                onChange={(v) => updateSelected("connecting_runs", v)}
+                                options={CONNECTING_RUNS_OPTIONS}
+                              />
+                              <SelectKV
+
                                 label="Ambulance Body No."
+
                                 value={selected.ambulance_body_no ?? ""}
+
                                 onChange={(v) => updateSelected("ambulance_body_no", v)}
+
+                                options={AMBULANCE_BODY_OPTIONS}
+
                               />
                             </>
                           ) : (
                             <>
                               <KeyValue label="Case Type" value={formatCaseTypeLabel(selected.case_type)} />
+                              <KeyValue
+                                label="Connecting Runs"
+                                value={formatConnectingRunsLabel(getConnectingRunsValue(selected))}
+                              />
                               <KeyValue label="Ambulance Body No." value={selected.ambulance_body_no} />
                             </>
                           )}
@@ -2626,9 +2944,13 @@ export default function Patients() {
                               />
                               <InputKV
                                 label="TOI"
-                                type="time"
-                                value={selected.toi ?? inc.toi ?? ""}
-                                onChange={(v) => updateIncident("toi", v)}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={4}
+                                suffix="H"
+                                value={timeFromApiToMilitary(selected.toi ?? inc.toi ?? "")}
+                                placeholder="0000"
+                                onChange={(v) => updateIncident("toi", normalizeMilitaryTimeInput(v))}
                               />
                               <InputKV
                                 label="POI"
@@ -2653,7 +2975,7 @@ export default function Patients() {
                                 )}
                               />
                               <KeyValue label="DOI" value={formatDateReadable(selected.doi || inc.doi)} />
-                              <KeyValue label="TOI" value={selected.toi || inc.toi} />
+                              <KeyValue label="TOI" value={formatMilitaryTimeWithH(selected.toi || inc.toi)} />
                               <KeyValue label="POI" value={selected.poi} />
                               <KeyValue label="MOI" value={selected.moi} />
                             </>
@@ -2670,6 +2992,7 @@ export default function Patients() {
                                   type="text"
                                   inputMode="numeric"
                                   maxLength={4}
+                                  suffix="H"
                                   value={timeFromApiToMilitary(selected?.[field.key] ?? "")}
                                   placeholder={field.placeholder}
                                   onChange={(v) => updateIncident(field.key, normalizeMilitaryTimeInput(v))}
@@ -2682,7 +3005,7 @@ export default function Patients() {
                                 <KeyValue
                                   key={field.key}
                                   label={field.label}
-                                  value={timeFromApiToMilitary(selected?.[field.key])}
+                                  value={formatMilitaryTimeWithH(selected?.[field.key])}
                                 />
                               ))}
                             </>

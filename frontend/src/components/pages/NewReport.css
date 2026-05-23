@@ -147,6 +147,10 @@
   grid-column: span 12;
 }
 
+.nr-quarter {
+  grid-column: span 3;
+}
+
 .nr-field label {
   font-size: 0.83rem;
   font-weight: 700;
@@ -547,7 +551,8 @@
 
 /* Responsive */
 @media (max-width: 1100px) {
-  .nr-field {
+  .nr-field,
+  .nr-quarter {
     grid-column: span 6;
   }
 }

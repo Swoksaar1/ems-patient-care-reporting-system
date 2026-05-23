@@ -27,6 +27,46 @@ const QUARTERS = [
   { label: "Quarter 4", value: "Q4", months: [9, 10, 11] },
 ];
 
+const AMBULANCE_BODY_OPTIONS = [
+  "PTV 70102",
+  "SND 2439",
+  "SKA 1130",
+  "City Ambu 6651",
+];
+
+const DAILY_TREND_CASE_TYPES = [
+  { key: "medical", label: "Medical", color: "#67e8f9" },
+  { key: "trauma", label: "Trauma", color: "#38bdf8" },
+  { key: "interfacility", label: "Interfacility", color: "#14b8a6" },
+  { key: "hostran", label: "Hostran", color: "#818cf8" },
+  { key: "standby_medics", label: "Standby Medics", color: "#f59e0b" },
+  { key: "back_to_base", label: "Back to Base", color: "#ef4444" },
+];
+
+function createEmptyDailyTrendCounts() {
+  return DAILY_TREND_CASE_TYPES.reduce((acc, item) => {
+    acc[item.key] = 0;
+    return acc;
+  }, {});
+}
+
+function buildDailyTrendSegments(caseTypeCounts = {}) {
+  return DAILY_TREND_CASE_TYPES.map((item) => ({
+    ...item,
+    value: Number(caseTypeCounts[item.key] || 0),
+  })).filter((item) => item.value > 0);
+}
+
+function getDailyTrendCaseTypeKey(report) {
+  const caseType = normalizeCaseType(getCaseTypeRaw(report));
+
+  if (DAILY_TREND_CASE_TYPES.some((item) => item.key === caseType)) {
+    return caseType;
+  }
+
+  return "";
+}
+
 const BARANGAYS = [
   "B1",
   "B2",
@@ -113,27 +153,27 @@ const BARANGAY_NUMBER_ALIASES = Array.from({ length: 12 }, (_, index) => {
 const MEDICAL_CLASSIFICATIONS = [
   "Abdominal Pain",
   "Alcohol Intoxication",
-  "Alergic Reaction",
+  "Allergic Reaction",
   "Bronchial Asthma",
   "Bleeding",
   "Body Malaise",
-  "Cellulities",
+  "Cellulitis",
   "Cyanosis",
   "Chest Pain",
   "Cough and Colds",
   "Difficult Urination",
   "Dizziness",
-  "Difficult of Breathing",
+  "Difficulty of Breathing",
   "Edema",
   "Epigastric Pain",
   "Epistaxis",
   "Fainting",
   "Fever",
-  "Hemoptisis",
+  "Hemoptysis",
   "Hypertension",
   "Loose Bowel Movement",
-  "Lost of Consciousness",
-  "Muscle Regidity",
+  "Loss of Consciousness",
+  "Muscle Rigidity",
   "Numbness",
   "Obstetrics",
   "Pain",
@@ -156,20 +196,21 @@ const TRAUMA_CLASSIFICATIONS = [
   "Burn",
   "Domestic Violence",
   "Drowning",
-  "Electricuted",
+  "Electrocuted",
   "Fall",
   "Hacking",
   "Hit and Run",
   "Insect and Animal Bites",
   "Mauling",
-  "Pedistrian Accident",
+  "Pedestrian Accident",
+  "Possible Breath of Alcohol",
   "Traumatic Injury",
   "Shooting",
   "Side Swipe",
   "Single Accident",
   "Sprain",
   "Stabbing",
-  "Stonning",
+  "Stoning",
   "Suicide",
 ];
 
@@ -179,14 +220,13 @@ const INTERFACILITY_CLASSIFICATIONS = [
   "BPMC or Bukidnon Provincial Medical Center",
   "St. Jude",
   "MIDWAY CLINIC or MIDWAY DOCTORS CLINIC",
-  "BBH or Barangay Health Center",
   "MMHC or Malaybalay Medical Hospital Clinic",
   "Hospital to Home",
-  "Follow Up Check Up",
+  "Follow-up Checkup",
   "School Clinic",
-  "Lying In",
+  "Lying-in",
   "Walk-In",
-  "Police station",
+  "Police Station",
   "City Health Office",
   "Dialysis",
   "St. Marina",
@@ -216,8 +256,54 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\./g, "")
     .replace(/-/g, " ")
+    .replace(/_/g, " ")
+    .replace(/[^A-Z0-9 ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeFacilityName(value) {
+  const raw = String(value || "").trim();
+
+  const text = raw
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\./g, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "";
+
+  const stJudeAliases = [
+    "SJTGH",
+    "ST JUDE",
+    "ST JUDE HOSPITAL",
+    "ST JUDE THADDEUS GENERAL HOSPITAL",
+    "SAINT JUDE",
+    "SAINT JUDE HOSPITAL",
+    "SAINT JUDE THADDEUS GENERAL HOSPITAL",
+  ];
+
+  if (stJudeAliases.includes(text)) {
+    return "St. Jude";
+  }
+
+  const hospitalToHomeAliases = [
+    "HOME",
+    "HOSPITAL TO HOME",
+    "HOSPITAL HOME",
+    "TRANSPORT TO HOME",
+    "DISCHARGE TO HOME",
+    "FROM HOSPITAL TO HOME",
+  ];
+
+  if (hospitalToHomeAliases.includes(text)) {
+    return "Hospital to Home";
+  }
+
+  return raw;
 }
 
 function escapeRegExp(value) {
@@ -235,23 +321,196 @@ function buildCountMap(labels = []) {
   return new Map(labels.map((label) => [label, 0]));
 }
 
+function getValueByCandidates(obj, candidates = []) {
+  for (const path of candidates) {
+    const parts = path.split(".");
+    let current = obj;
+
+    for (const part of parts) {
+      current = current?.[part];
+      if (current === undefined || current === null) break;
+    }
+
+    if (current !== undefined && current !== null && String(current).trim() !== "") {
+      return String(current).trim();
+    }
+  }
+
+  return "";
+}
+
+function normalizeAmbulanceBodyNo(value) {
+  const text = normalizeText(value);
+
+  if (!text) return "";
+
+  if (text.includes("PTV") && text.includes("70102")) return "PTV 70102";
+  if (text.includes("SND") && text.includes("2439")) return "SND 2439";
+  if (text.includes("SKA") && text.includes("1130")) return "SKA 1130";
+
+  if (
+    text.includes("CITY AMBU 6651") ||
+    text.includes("CITY AMBULANCE 6651") ||
+    text.includes("AMBU 6651") ||
+    text.includes("AMBULANCE 6651") ||
+    text === "6651"
+  ) {
+    return "City Ambu 6651";
+  }
+
+  return "";
+}
+
+function getAmbulanceBodyNo(report) {
+  return (
+    getValueByCandidates(report, [
+      "ambulance_body_no",
+      "ambulance_body_number",
+      "ambulanceBodyNo",
+      "ambulanceBodyNumber",
+      "ambulance",
+      "ambulance_no",
+      "ambulance_number",
+      "unit",
+      "unit_no",
+      "vehicle",
+      "vehicle_no",
+      "incident.ambulance_body_no",
+      "incident.ambulance_body_number",
+      "incident.ambulanceBodyNo",
+      "incident.ambulanceBodyNumber",
+      "incident.ambulance",
+      "incident.ambulance_no",
+      "incident.ambulance_number",
+      "details.ambulance_body_no",
+      "details.ambulance",
+      "form_data.ambulance_body_no",
+      "form_data.ambulance",
+    ]) || ""
+  );
+}
+
+function getConnectingRunsRaw(report) {
+  return getValueByCandidates(report, [
+    "connecting_runs",
+    "connectingRuns",
+    "connecting_run",
+    "connectingRun",
+    "connected_runs",
+    "connectedRuns",
+    "is_connecting_run",
+    "isConnectingRun",
+    "patient.connecting_runs",
+    "patient.connectingRuns",
+    "patient.connecting_run",
+    "patient.connectingRun",
+    "incident.connecting_runs",
+    "incident.connectingRuns",
+    "incident.connecting_run",
+    "incident.connectingRun",
+    "details.connecting_runs",
+    "details.connectingRuns",
+    "form_data.connecting_runs",
+    "form_data.connectingRuns",
+  ]);
+}
+
+function isConnectingRun(report) {
+  const value = getConnectingRunsRaw(report);
+
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+
+  const text = normalizeText(value);
+
+  if (!text || text === "NA" || text === "N A") return false;
+  if (text === "NO" || text === "FALSE" || text === "0") return false;
+
+  return (
+    text === "YES" ||
+    text === "Y" ||
+    text === "TRUE" ||
+    text === "1" ||
+    text.includes("CONNECTING") ||
+    text.includes("CONNECTED")
+  );
+}
+
 const MEDICAL_ALIASES = {
-  "Alergic Reaction": ["Allergic Reaction"],
-  Cellulities: ["Cellulitis"],
-  Hemoptisis: ["Hemoptysis"],
-  "Lost of Consciousness": ["Loss of Consciousness"],
-  "Muscle Regidity": ["Muscle Rigidity"],
-  "Difficult of Breathing": ["Difficulty of Breathing", "Difficulty Breathing"],
+  "Abdominal Pain": ["Abdominal P"],
+  "Alcohol Intoxication": ["Alcohol Intx"],
+  "Allergic Reaction": ["Alergic Reaction", "Allergic Reaction"],
+  "Bronchial Asthma": ["BA"],
+  Cellulitis: ["Cellulities", "Cellulitis"],
+  "Difficult Urination": ["Dif. Urination"],
+  "Difficulty of Breathing": [
+    "DOB",
+    "Difficult of Breathing",
+    "Difficulty of Breathing",
+    "Difficulty Breathing",
+  ],
+  "Epigastric Pain": ["Epigastric P"],
+  Hemoptysis: ["Hemoptisis", "Hemoptysis"],
+  Hypertension: ["HPN"],
+  "Loose Bowel Movement": ["LBM"],
+  "Loss of Consciousness": [
+    "LOC",
+    "Lost of Consciousness",
+    "Loss of Consciousness",
+  ],
+  "Muscle Rigidity": ["Muscle Regidity", "Muscle Rigidity"],
+  Obstetrics: ["OB"],
 };
 
 const TRAUMA_ALIASES = {
-  "2X2 V/A or 2X2 Vehicle Accident": ["2X2 V/A", "2X2 Vehicle Accident"],
-  "4X2 V/A or 4X2 Vehicle Accident": ["4X2 V/A", "4X2 Vehicle Accident"],
-  "4X4 V/A or 4X4 Vehicle Accident": ["4X4 V/A", "4X4 Vehicle Accident"],
-  Electricuted: ["Electrocuted"],
-  "Pedistrian Accident": ["Pedestrian Accident"],
-  Stonning: ["Stoning"],
+  "2X2 V/A or 2X2 Vehicle Accident": [
+    "2X2 V/A",
+    "2X2 Vehicle Accident",
+    "2X2 VA",
+    "2X2 Vehicular Accident",
+  ],
+  "4X2 V/A or 4X2 Vehicle Accident": [
+    "4X2 V/A",
+    "4X2 Vehicle Accident",
+    "4X2 VA",
+    "4X2 Vehicular Accident",
+  ],
+  "4X4 V/A or 4X4 Vehicle Accident": [
+    "4X4 V/A",
+    "4X4 Vehicle Accident",
+    "4X4 VA",
+    "4X4 Vehicular Accident",
+  ],
+  "Possible Breath of Alcohol": [
+    "Possible Breath of Alcohol",
+    "Breath of Alcohol",
+    "Possible Alcohol Breath",
+    "Alcohol Breath",
+    "PBOA",
+  ],
+  Electrocuted: ["Electricuted", "Electrocuted"],
+  "Hit and Run": ["Hit & Run"],
+  "Insect and Animal Bites": ["I & A Bites"],
+  "Pedestrian Accident": [
+    "Pedistrian Accident",
+    "Pedestrian Accident",
+    "Pedestrian Acc",
+  ],
+  "Single Accident": ["Single Acc"],
+  Stoning: ["Stonning", "Stoning"],
 };
+
+const POSSIBLE_BREATH_OF_ALCOHOL_LABEL = "Possible Breath of Alcohol";
+
+function isPossibleBreathOfAlcohol(value) {
+  return (
+    getCanonicalMappedLabel(
+      value,
+      new Map([[POSSIBLE_BREATH_OF_ALCOHOL_LABEL, 0]]),
+      TRAUMA_ALIASES
+    ) === POSSIBLE_BREATH_OF_ALCOHOL_LABEL
+  );
+}
 
 const INTERFACILITY_ALIASES = {
   "MPGH or Malaybalay Polymedic General Hospital": [
@@ -263,7 +522,18 @@ const INTERFACILITY_ALIASES = {
     "BPMC",
     "Bukidnon Provincial Medical Center",
   ],
-  "MIDWAY CLINIC or MIDWAY DOCTOR CLINIC": [
+  "St. Jude": [
+    "SJTGH",
+    "ST JUDE",
+    "ST. JUDE",
+    "St Jude",
+    "St. Jude",
+    "St. Jude Hospital",
+    "St Jude Hospital",
+    "St. Jude Thaddeus General Hospital",
+    "St Jude Thaddeus General Hospital",
+  ],
+  "MIDWAY CLINIC or MIDWAY DOCTORS CLINIC": [
     "MIDWAY",
     "MIDWAY CLINIC",
     "MIDWAY DOCTOR CLINIC",
@@ -275,26 +545,60 @@ const INTERFACILITY_ALIASES = {
     "MMHC",
     "Malaybalay Medical Hospital Clinic",
   ],
+  "Hospital to Home": [
+    "Home",
+    "HOME",
+    "home",
+    "Hospital to Home",
+    "Hospital-to-Home",
+    "Hospital Home",
+    "Transport to Home",
+    "Discharge to Home",
+    "From Hospital to Home",
+  ],
+  "Follow-up Checkup": [
+    "Follow Up Check Up",
+    "Follow Up Checkup",
+    "Follow-up Check Up",
+    "Follow-up Check-up",
+    "Follow-up Checkup",
+  ],
+  "Lying-in": ["Lying In", "Lying-in", "Lying In Clinic"],
+  "Police Station": ["Police station", "Police Station"],
 };
 
-function incrementMappedCount(map, rawValue, aliases = {}) {
+function getCanonicalMappedLabel(rawValue, map, aliases = {}) {
   const normalizedRaw = normalizeText(rawValue);
-  if (!normalizedRaw) return;
+  if (!normalizedRaw) return "";
 
-  for (const [label, aliasList] of Object.entries(aliases)) {
-    const allNames = [label, ...(aliasList || [])].map(normalizeText);
-    if (allNames.includes(normalizedRaw)) {
-      map.set(label, (map.get(label) || 0) + 1);
-      return;
-    }
-  }
+  const matchers = [...map.keys()]
+    .map((label) => ({
+      label,
+      names: [label, ...(aliases[label] || [])].map(normalizeText),
+    }))
+    .sort((a, b) => {
+      const aLongest = Math.max(...a.names.map((name) => name.length));
+      const bLongest = Math.max(...b.names.map((name) => name.length));
+      return bLongest - aLongest;
+    });
 
-  for (const key of map.keys()) {
-    if (normalizeText(key) === normalizedRaw) {
-      map.set(key, (map.get(key) || 0) + 1);
-      return;
-    }
-  }
+  const found = matchers.find((item) =>
+    item.names.some((name) => {
+      if (!name) return false;
+      if (normalizedRaw === name) return true;
+      return containsNormalizedTerm(normalizedRaw, name);
+    })
+  );
+
+  return found?.label || "";
+}
+
+function incrementMappedCount(map, rawValue, aliases = {}) {
+  const label = getCanonicalMappedLabel(rawValue, map, aliases);
+
+  if (!label) return;
+
+  map.set(label, (map.get(label) || 0) + 1);
 }
 
 function getBarangayFromAddress(address) {
@@ -303,9 +607,9 @@ function getBarangayFromAddress(address) {
   if (!normalizedAddress) return null;
 
   const aliases = {
-    "STO. NINO": ["STO NINO", "SANTO NINO"],
+    "STO. NINO": ["STO NINO", "SANTO NINO", "STO. NINO"],
     "PAT-PAT": ["PAT PAT", "PATPAT"],
-    "APO MACOTE": ["APO MACOTE"],
+    "APO MACOTE": ["APO MACOTE", "APOMACOTE"],
     "SAN JOSE": ["SAN JOSE"],
     "SAN MARTIN": ["SAN MARTIN"],
   };
@@ -353,7 +657,12 @@ function normalizeCaseType(caseType) {
   const value = String(caseType || "")
     .trim()
     .toLowerCase()
-    .replace(/[\s-]+/g, "_");
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[._-]+/g, "_")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
   if (!value) return "";
 
@@ -362,8 +671,14 @@ function normalizeCaseType(caseType) {
   if (value.includes("interfacility") || value.includes("inter_facility")) {
     return "interfacility";
   }
-  if (value.includes("hostran") || value.includes("host_ran")) return "hostran";
-  if (value.includes("hospital_transport")) return "hostran";
+  if (
+    value.includes("hostran") ||
+    value.includes("host_ran") ||
+    value.includes("hospital_transport") ||
+    value.includes("hosp_transport")
+  ) {
+    return "hostran";
+  }
   if (value.includes("standby")) return "standby_medics";
   if (value.includes("back_to_base") || value.includes("back_base")) {
     return "back_to_base";
@@ -468,38 +783,100 @@ function formatLocalDateKey(date) {
 function getReportDate(report) {
   return (
     safeDate(report?.doi) ||
-    safeDate(report?.incident?.doi) ||
+    safeDate(report?.DOI) ||
     safeDate(report?.date_of_incident) ||
+    safeDate(report?.dateOfIncident) ||
+    safeDate(report?.incident?.doi) ||
+    safeDate(report?.incident?.DOI) ||
     safeDate(report?.incident?.date_of_incident) ||
-    safeDate(report?.incident_date) ||
-    safeDate(report?.incident?.incident_date) ||
-    safeDate(report?.date) ||
-    safeDate(report?.created_at) ||
-    safeDate(report?.created) ||
-    safeDate(report?.timestamp) ||
-    safeDate(report?.datetime) ||
-    safeDate(report?.incident_datetime) ||
-    safeDate(report?.updated_at) ||
+    safeDate(report?.incident?.dateOfIncident) ||
+    safeDate(report?.patient?.doi) ||
+    safeDate(report?.patient?.DOI) ||
+    safeDate(report?.patient?.date_of_incident) ||
+    safeDate(report?.patient?.dateOfIncident) ||
+    safeDate(report?.patient_details?.doi) ||
+    safeDate(report?.patient_details?.DOI) ||
+    safeDate(report?.patient_details?.date_of_incident) ||
+    safeDate(report?.patient_details?.dateOfIncident) ||
+    safeDate(report?.form_data?.doi) ||
+    safeDate(report?.form_data?.DOI) ||
+    safeDate(report?.form_data?.date_of_incident) ||
+    safeDate(report?.form_data?.dateOfIncident) ||
     null
   );
 }
 
 function getAddress(report) {
   return (
-    report?.patient?.address ||
-    report?.address ||
     report?.patient_location ||
+    report?.incident?.patient_location ||
     report?.location ||
+    report?.incident?.location ||
+    report?.poi ||
+    report?.incident?.poi ||
+    report?.patient?.address ||
+    report?.patient_details?.address ||
+    report?.details?.address ||
+    report?.form_data?.address ||
+    report?.address ||
     ""
   );
+}
+
+function getTransportedToRaw(report) {
+  return getValueByCandidates(report, [
+    "transported_to",
+    "transportedTo",
+    "destination",
+    "hospital",
+    "facility",
+    "receiving_facility",
+    "receivingFacility",
+    "patient.transported_to",
+    "patient.transportedTo",
+    "incident.transported_to",
+    "incident.transportedTo",
+    "details.transported_to",
+    "details.transportedTo",
+    "form_data.transported_to",
+    "form_data.transportedTo",
+  ]);
 }
 
 function getChiefComplaint(report) {
   return report?.patient?.chief_complaint || report?.chief_complaint || "";
 }
 
+function getAssessment(report) {
+  return (
+    report?.patient?.assessment ||
+    report?.assessment ||
+    report?.patient_assessment ||
+    report?.incident?.assessment ||
+    report?.details?.assessment ||
+    report?.form_data?.assessment ||
+    ""
+  );
+}
+
+function getMechanismOfIncident(report) {
+  return (
+    report?.moi ||
+    report?.incident?.moi ||
+    report?.mechanism_of_incident ||
+    report?.incident?.mechanism_of_incident ||
+    report?.mechanismOfIncident ||
+    report?.incident?.mechanismOfIncident ||
+    report?.details?.moi ||
+    report?.details?.mechanism_of_incident ||
+    report?.form_data?.moi ||
+    report?.form_data?.mechanism_of_incident ||
+    ""
+  );
+}
+
 function getFacility(report) {
-  return report?.transported_to || "";
+  return normalizeFacilityName(getTransportedToRaw(report));
 }
 
 function getCaseTypeLabel(caseType) {
@@ -645,12 +1022,132 @@ function buildClassificationPages(reportData) {
   return pages;
 }
 
+function buildDailyTrendData(filteredReports, summaryType, selectedMonth, selectedQuarter, selectedYear) {
+  const reportsList = Array.isArray(filteredReports) ? filteredReports : [];
+
+  if (summaryType === "Monthly") {
+    const monthIndex = getMonthIndex(selectedMonth);
+    const year = Number(selectedYear);
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+    const daily = Array.from({ length: daysInMonth }, (_, index) => ({
+      label: String(index + 1),
+      count: 0,
+      caseTypeCounts: createEmptyDailyTrendCounts(),
+    }));
+
+    reportsList.forEach((report) => {
+      const date = getReportDate(report);
+      if (!date) return;
+
+      if (date.getFullYear() !== year || date.getMonth() !== monthIndex) return;
+
+      const index = date.getDate() - 1;
+      if (!daily[index]) return;
+
+      daily[index].count += 1;
+
+      const caseTypeKey = getDailyTrendCaseTypeKey(report);
+      if (caseTypeKey) {
+        daily[index].caseTypeCounts[caseTypeKey] += 1;
+      }
+    });
+
+    return {
+      title: "DAILY RUNS TREND",
+      subtitle: `Runs recorded per day in ${selectedMonth} ${selectedYear} based on DOI.`,
+      rows: daily.map((item) => ({
+        ...item,
+        segments: buildDailyTrendSegments(item.caseTypeCounts),
+      })),
+      legend: DAILY_TREND_CASE_TYPES,
+      xLabel: "Day",
+    };
+  }
+
+  if (summaryType === "Quarterly") {
+    const quarterMonths = getQuarterMonths(selectedQuarter);
+
+    const monthly = quarterMonths.map((monthIndex) => ({
+      label: MONTHS[monthIndex].slice(0, 3),
+      count: 0,
+      caseTypeCounts: createEmptyDailyTrendCounts(),
+    }));
+
+    reportsList.forEach((report) => {
+      const date = getReportDate(report);
+      if (!date) return;
+
+      const monthPosition = quarterMonths.indexOf(date.getMonth());
+      if (monthPosition < 0 || !monthly[monthPosition]) return;
+
+      monthly[monthPosition].count += 1;
+
+      const caseTypeKey = getDailyTrendCaseTypeKey(report);
+      if (caseTypeKey) {
+        monthly[monthPosition].caseTypeCounts[caseTypeKey] += 1;
+      }
+    });
+
+    return {
+      title: "RUNS TREND",
+      subtitle: `Runs recorded per month in ${getQuarterLabel(selectedQuarter)} ${selectedYear} based on DOI.`,
+      rows: monthly.map((item) => ({
+        ...item,
+        segments: buildDailyTrendSegments(item.caseTypeCounts),
+      })),
+      legend: DAILY_TREND_CASE_TYPES,
+      xLabel: "Month",
+    };
+  }
+
+  const annual = MONTHS.map((monthName) => ({
+    label: monthName.slice(0, 3),
+    count: 0,
+    caseTypeCounts: createEmptyDailyTrendCounts(),
+  }));
+
+  reportsList.forEach((report) => {
+    const date = getReportDate(report);
+    if (!date) return;
+
+    const monthIndex = date.getMonth();
+    if (!annual[monthIndex]) return;
+
+    annual[monthIndex].count += 1;
+
+    const caseTypeKey = getDailyTrendCaseTypeKey(report);
+    if (caseTypeKey) {
+      annual[monthIndex].caseTypeCounts[caseTypeKey] += 1;
+    }
+  });
+
+  return {
+    title: "RUNS TREND",
+    subtitle: `Runs recorded per month in ${selectedYear} based on DOI.`,
+    rows: annual.map((item) => ({
+      ...item,
+      segments: buildDailyTrendSegments(item.caseTypeCounts),
+    })),
+    legend: DAILY_TREND_CASE_TYPES,
+    xLabel: "Month",
+  };
+}
+
 function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, selectedYear) {
   const filteredReports = (reports || []).filter((report) =>
     matchesSelectedPeriod(report, summaryType, selectedMonth, selectedQuarter, selectedYear)
   );
 
   const totalResponses = filteredReports.length;
+  const connectingRunsCount = filteredReports.filter((report) => isConnectingRun(report)).length;
+  const dailyTrend = buildDailyTrendData(
+    filteredReports,
+    summaryType,
+    selectedMonth,
+    selectedQuarter,
+    selectedYear
+  );
 
   const averagePerDay =
     totalResponses > 0
@@ -690,6 +1187,7 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
   const requestingFacilityCounts = new Map();
   const barangayCounts = new Map();
   const standbyMedicsCounts = new Map();
+  const ambulanceCounts = new Map(AMBULANCE_BODY_OPTIONS.map((label) => [label, 0]));
 
   const classificationMedicalCounts = buildCountMap(MEDICAL_CLASSIFICATIONS);
   const classificationTraumaCounts = buildCountMap(TRAUMA_CLASSIFICATIONS);
@@ -707,9 +1205,14 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
     const address = getAddress(report);
     const barangayKey = getBarangayKeyForReport(report);
     const reportDate = getReportDate(report);
+    const ambulanceBodyNo = normalizeAmbulanceBodyNo(getAmbulanceBodyNo(report));
 
     if (caseTypeLabel) {
       responseTypeCounts.set(caseTypeLabel, (responseTypeCounts.get(caseTypeLabel) || 0) + 1);
+    }
+
+    if (ambulanceBodyNo) {
+      ambulanceCounts.set(ambulanceBodyNo, (ambulanceCounts.get(ambulanceBodyNo) || 0) + 1);
     }
 
     if (barangayKey) {
@@ -728,17 +1231,63 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
 
     if (caseType === "medical") {
       const chiefComplaint = getChiefComplaint(report);
+
       if (chiefComplaint) {
-        medicalCaseCounts.set(chiefComplaint, (medicalCaseCounts.get(chiefComplaint) || 0) + 1);
-        incrementMappedCount(classificationMedicalCounts, chiefComplaint, MEDICAL_ALIASES);
+        const medicalLabel = getCanonicalMappedLabel(
+          chiefComplaint,
+          classificationMedicalCounts,
+          MEDICAL_ALIASES
+        );
+
+        const displayLabel = medicalLabel || chiefComplaint;
+
+        medicalCaseCounts.set(
+          displayLabel,
+          (medicalCaseCounts.get(displayLabel) || 0) + 1
+        );
+
+        incrementMappedCount(
+          classificationMedicalCounts,
+          chiefComplaint,
+          MEDICAL_ALIASES
+        );
       }
     }
 
     if (caseType === "trauma") {
-      const chiefComplaint = getChiefComplaint(report);
-      if (chiefComplaint) {
-        traumaCaseCounts.set(chiefComplaint, (traumaCaseCounts.get(chiefComplaint) || 0) + 1);
-        incrementMappedCount(classificationTraumaCounts, chiefComplaint, TRAUMA_ALIASES);
+      const moi = getMechanismOfIncident(report);
+      const assessment = getAssessment(report);
+
+      const moiHasPossibleBreathOfAlcohol = isPossibleBreathOfAlcohol(moi);
+      const assessmentHasPossibleBreathOfAlcohol = isPossibleBreathOfAlcohol(assessment);
+
+      if (moi) {
+        const traumaLabel = getCanonicalMappedLabel(
+          moi,
+          classificationTraumaCounts,
+          TRAUMA_ALIASES
+        );
+
+        const displayLabel = traumaLabel || moi;
+
+        traumaCaseCounts.set(
+          displayLabel,
+          (traumaCaseCounts.get(displayLabel) || 0) + 1
+        );
+
+        incrementMappedCount(classificationTraumaCounts, moi, TRAUMA_ALIASES);
+      }
+
+      if (assessmentHasPossibleBreathOfAlcohol && !moiHasPossibleBreathOfAlcohol) {
+        traumaCaseCounts.set(
+          POSSIBLE_BREATH_OF_ALCOHOL_LABEL,
+          (traumaCaseCounts.get(POSSIBLE_BREATH_OF_ALCOHOL_LABEL) || 0) + 1
+        );
+
+        classificationTraumaCounts.set(
+          POSSIBLE_BREATH_OF_ALCOHOL_LABEL,
+          (classificationTraumaCounts.get(POSSIBLE_BREATH_OF_ALCOHOL_LABEL) || 0) + 1
+        );
       }
     }
 
@@ -830,8 +1379,7 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
       averageResponseTime:
         row.responseTimes.length > 0
           ? (
-              row.responseTimes.reduce((sum, v) => sum + v, 0) /
-              row.responseTimes.length
+              row.responseTimes.reduce((sum, v) => sum + v, 0) / row.responseTimes.length
             ).toFixed(2)
           : "—",
     }));
@@ -871,11 +1419,27 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
     formatPercent(count, totalResponses),
   ]);
 
+  const ambulanceRuns = AMBULANCE_BODY_OPTIONS.map((label, index) => ({
+    label,
+    count: ambulanceCounts.get(label) || 0,
+    percent: formatPercent(ambulanceCounts.get(label) || 0, totalResponses),
+    originalIndex: index,
+  })).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.originalIndex - b.originalIndex;
+  });
+
+  const ambulanceRunsTotal = ambulanceRuns.reduce(
+    (sum, item) => sum + Number(item.count || 0),
+    0
+  );
+
   return {
     totals: {
       responses: totalResponses || "—",
       averagePerDay,
       averageResponseTime,
+      connectingRuns: connectingRunsCount,
     },
     responseTypes: responseTypeMapped.rows,
     responseTypesTotal: responseTypeMapped.total,
@@ -888,7 +1452,10 @@ function buildReportData(reports, summaryType, selectedMonth, selectedQuarter, s
     barangays: barangayMapped.rows,
     barangaysTotal: barangayMapped.total,
     standbyMedics,
+    ambulanceRuns,
+    ambulanceRunsTotal: [ambulanceRunsTotal, formatPercent(ambulanceRunsTotal, totalResponses)],
     dailyRuns,
+    dailyTrend,
     barangaySummary: BARANGAYS.map((b) => barangaySummaryMap.get(b)),
     classificationSummary: {
       medical: classificationMedicalMapped.rows,
@@ -941,7 +1508,49 @@ function SectionTable({ title, rows = [], total, sectionClass = "" }) {
   );
 }
 
-function DailyRunsTable({ rows = [] }) {
+function DailyRunsTable({ rows = [], showTotal = false, allRows = [] }) {
+  const sourceRows = allRows.length ? allRows : rows;
+
+  const totals = sourceRows.reduce(
+    (acc, row) => {
+      acc.medicalIn += Number(row.medicalIn || 0);
+      acc.medicalOut += Number(row.medicalOut || 0);
+      acc.traumaIn += Number(row.traumaIn || 0);
+      acc.traumaOut += Number(row.traumaOut || 0);
+      acc.interFacilityWithinCity += Number(row.interFacilityWithinCity || 0);
+      acc.hospitalTransportOutsideCity += Number(row.hospitalTransportOutsideCity || 0);
+      acc.backToBase += Number(row.backToBase || 0);
+      acc.total += Number(row.total || 0);
+
+      if (Array.isArray(row.responseTimes)) {
+        row.responseTimes.forEach((value) => {
+          const minutes = Number(value);
+          if (Number.isFinite(minutes)) acc.responseTimes.push(minutes);
+        });
+      }
+
+      return acc;
+    },
+    {
+      medicalIn: 0,
+      medicalOut: 0,
+      traumaIn: 0,
+      traumaOut: 0,
+      interFacilityWithinCity: 0,
+      hospitalTransportOutsideCity: 0,
+      backToBase: 0,
+      total: 0,
+      responseTimes: [],
+    }
+  );
+
+  const totalAverageResponseTime = totals.responseTimes.length
+    ? (
+        totals.responseTimes.reduce((sum, value) => sum + value, 0) /
+        totals.responseTimes.length
+      ).toFixed(2)
+    : "—";
+
   return (
     <table className="report-table report-table-sm report-daily-table">
       <thead>
@@ -949,7 +1558,7 @@ function DailyRunsTable({ rows = [] }) {
           <th rowSpan="2">DATE</th>
           <th colSpan="2">MEDICAL</th>
           <th colSpan="2">TRAUMA</th>
-          <th rowSpan="2">AVERAGE RESPONSE TIME within 5 km. radius (minute)</th>
+          <th rowSpan="2">AVERAGE RESPOND TIME within 5km radius (minute)</th>
           <th rowSpan="2">INTER-FACILITY within the City</th>
           <th rowSpan="2">HOSPITAL TRANSPORT outside the City</th>
           <th rowSpan="2">Back to base</th>
@@ -964,20 +1573,37 @@ function DailyRunsTable({ rows = [] }) {
       </thead>
       <tbody>
         {rows.length > 0 ? (
-          rows.map((row, index) => (
-            <tr key={index}>
-              <td>{row.date}</td>
-              <td>{row.medicalIn}</td>
-              <td>{row.medicalOut}</td>
-              <td>{row.traumaIn}</td>
-              <td>{row.traumaOut}</td>
-              <td>{row.averageResponseTime}</td>
-              <td>{row.interFacilityWithinCity}</td>
-              <td>{row.hospitalTransportOutsideCity}</td>
-              <td>{row.backToBase}</td>
-              <td>{row.total}</td>
-            </tr>
-          ))
+          <>
+            {rows.map((row, index) => (
+              <tr key={index}>
+                <td>{row.date}</td>
+                <td>{row.medicalIn}</td>
+                <td>{row.medicalOut}</td>
+                <td>{row.traumaIn}</td>
+                <td>{row.traumaOut}</td>
+                <td>{row.averageResponseTime}</td>
+                <td>{row.interFacilityWithinCity}</td>
+                <td>{row.hospitalTransportOutsideCity}</td>
+                <td>{row.backToBase}</td>
+                <td>{row.total}</td>
+              </tr>
+            ))}
+
+            {showTotal && (
+              <tr className="total-row">
+                <td>TOTAL</td>
+                <td>{totals.medicalIn}</td>
+                <td>{totals.medicalOut}</td>
+                <td>{totals.traumaIn}</td>
+                <td>{totals.traumaOut}</td>
+                <td>{totalAverageResponseTime}</td>
+                <td>{totals.interFacilityWithinCity}</td>
+                <td>{totals.hospitalTransportOutsideCity}</td>
+                <td>{totals.backToBase}</td>
+                <td>{totals.total}</td>
+              </tr>
+            )}
+          </>
         ) : (
           <tr>
             <td colSpan="10" className="empty-cell">
@@ -1106,6 +1732,438 @@ function ClassificationSummaryTable({ title, rows = [], total, showTotal = true 
   );
 }
 
+function AmbulanceRunsBarGraph({ rows = [], total = [0, "0%"] }) {
+  const data = Array.isArray(rows) ? rows : [];
+  const maxCount = Math.max(...data.map((item) => Number(item.count || 0)), 1);
+  const totalRuns = Number(total?.[0] || 0);
+
+  return (
+    <div className="report-ambulance-graph-card">
+      <div className="report-ambulance-graph-title-row">
+        <div>
+          <h4>AMBULANCE RUNS BAR GRAPH</h4>
+          <p>Runs per ambulance based on the selected DOI period.</p>
+        </div>
+        <div className="report-ambulance-total-card">
+          <span>Total Runs</span>
+          <strong>{totalRuns}</strong>
+        </div>
+      </div>
+
+      <div className="report-ambulance-chart">
+        <div className="report-ambulance-y-axis">
+          {[100, 75, 50, 25, 0].map((tick) => (
+            <span key={tick}>{Math.round((maxCount * tick) / 100)}</span>
+          ))}
+        </div>
+
+        <div className="report-ambulance-bars">
+          {data.map((item) => {
+            const count = Number(item.count || 0);
+            const height = maxCount > 0 ? Math.max((count / maxCount) * 100, count > 0 ? 8 : 2) : 2;
+
+            return (
+              <div className="report-ambulance-bar-col" key={item.label}>
+                <div className="report-ambulance-bar-wrap">
+                  <div
+                    className="report-ambulance-bar"
+                    style={{ height: `${height}%` }}
+                    aria-label={`${item.label}: ${count} runs`}
+                  >
+                    <span>{count}</span>
+                  </div>
+                </div>
+                <div className="report-ambulance-bar-label">{item.label}</div>
+                <div className="report-ambulance-bar-percent">{item.percent}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <table className="report-table report-table-sm report-ambulance-summary-table">
+        <thead>
+          <tr>
+            <th>AMBULANCE</th>
+            <th>NO. OF RUNS</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.length > 0 ? (
+            <>
+              {data.map((item) => (
+                <tr key={`ambulance-row-${item.label}`}>
+                  <td>{item.label}</td>
+                  <td>{item.count}</td>
+                  <td>{item.percent}</td>
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td>TOTAL</td>
+                <td>{total?.[0] ?? 0}</td>
+                <td>{total?.[1] ?? "0%"}</td>
+              </tr>
+            </>
+          ) : (
+            <tr>
+              <td colSpan="3" className="empty-cell">
+                No data available.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DailyRunsTrendBarGraph({ trend = {} }) {
+  const rows = Array.isArray(trend?.rows) ? trend.rows : [];
+  const legend = Array.isArray(trend?.legend) && trend.legend.length ? trend.legend : DAILY_TREND_CASE_TYPES;
+  const highestCount = Math.max(...rows.map((item) => Number(item.count || 0)), 0);
+  const maxCount = Math.max(35, Math.ceil(highestCount / 5) * 5 || 0);
+  const yTicks = [];
+
+  for (let tick = maxCount; tick >= 0; tick -= 5) {
+    yTicks.push(tick);
+  }
+
+  if (!yTicks.includes(0)) {
+    yTicks.push(0);
+  }
+
+  const totalRuns = rows.reduce((sum, item) => sum + Number(item.count || 0), 0);
+
+  return (
+    <div className="report-daily-trend-card">
+      <div className="report-daily-trend-title-row">
+        <div>
+          <h4>{trend?.title || "DAILY RUNS TREND"}</h4>
+          <p>{trend?.subtitle || "Runs recorded based on DOI."}</p>
+        </div>
+        <div className="report-daily-trend-total-card">
+          <span>Total Runs</span>
+          <strong>{totalRuns}</strong>
+        </div>
+      </div>
+
+      <div className="report-daily-trend-legend" aria-label="Daily runs trend legend">
+        {legend.map((item) => (
+          <div className="report-daily-trend-legend-item" key={item.key}>
+            <span
+              className="report-daily-trend-legend-dot"
+              style={{ backgroundColor: item.color }}
+            />
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="report-daily-trend-chart">
+        <div className="report-daily-trend-y-axis">
+          {yTicks.map((tick, index) => (
+            <span key={`${tick}-${index}`}>{tick}</span>
+          ))}
+        </div>
+
+        <div
+          className="report-daily-trend-bars"
+          style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))` }}
+        >
+          {rows.map((item, index) => {
+            const count = Number(item.count || 0);
+            const height = maxCount > 0 ? Math.max((count / maxCount) * 100, count > 0 ? 8 : 2) : 2;
+            const segments = Array.isArray(item.segments) ? item.segments : [];
+            const ariaSegments = segments.length
+              ? segments.map((segment) => `${segment.label}: ${segment.value}`).join(", ")
+              : "No runs";
+
+            return (
+              <div className="report-daily-trend-bar-col" key={`${item.label}-${index}`}>
+                <div className="report-daily-trend-bar-wrap">
+                  <div
+                    className="report-daily-trend-bar"
+                    style={{ height: `${height}%` }}
+                    aria-label={`${trend?.xLabel || "Day"} ${item.label}: ${count} runs. ${ariaSegments}`}
+                  >
+                    {segments.length > 0 && (
+                      <div className="report-daily-trend-bar-stack">
+                        {segments.map((segment) => (
+                          <div
+                            className="report-daily-trend-bar-segment"
+                            key={segment.key}
+                            style={{
+                              height: `${(Number(segment.value || 0) / count) * 100}%`,
+                              backgroundColor: segment.color,
+                            }}
+                            title={`${segment.label}: ${segment.value}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <span>{count}</span>
+                  </div>
+                </div>
+                <div className="report-daily-trend-bar-label">{item.label}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function getDailyTrendCountValue(row, key) {
+  if (!row || !key) return 0;
+
+  if (row.caseTypeCounts && row.caseTypeCounts[key] !== undefined) {
+    return Number(row.caseTypeCounts[key] || 0);
+  }
+
+  const segment = Array.isArray(row.segments)
+    ? row.segments.find((item) => item.key === key)
+    : null;
+
+  return Number(segment?.value || 0);
+}
+
+function getDailyTrendDistributionRows(trend = {}) {
+  const rows = Array.isArray(trend?.rows) ? trend.rows : [];
+  const totalRuns = rows.reduce((sum, row) => sum + Number(row?.count || 0), 0);
+
+  return DAILY_TREND_CASE_TYPES.map((item) => {
+    const count = rows.reduce((sum, row) => {
+      return sum + getDailyTrendCountValue(row, item.key);
+    }, 0);
+
+    const percent = totalRuns > 0 ? `${Math.round((count / totalRuns) * 100)}%` : "0%";
+
+    return {
+      ...item,
+      count,
+      percent,
+    };
+  });
+}
+
+function DailyTrendCaseTypePieChart({ trend = {} }) {
+  const rows = getDailyTrendDistributionRows(trend);
+  const totalRuns = rows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+  const radius = 46;
+  const stroke = 18;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  let cumulative = 0;
+
+  return (
+    <div className="report-daily-trend-pie-card">
+      <div className="report-daily-trend-pie-head">
+        <div>
+          <h4>CASE TYPE DISTRIBUTION</h4>
+          <p>Auto-counted from each report&apos;s case type.</p>
+        </div>
+        <div className="report-daily-trend-pie-total">
+          <span>Total Runs</span>
+          <strong>{totalRuns}</strong>
+        </div>
+      </div>
+
+      <div className="report-daily-trend-pie-content">
+        <div className="report-daily-trend-pie-wrap">
+          <svg viewBox="0 0 120 120" className="report-daily-trend-pie-svg" aria-label="Case type distribution pie chart">
+            <circle
+              cx="60"
+              cy="60"
+              r={normalizedRadius}
+              fill="transparent"
+              stroke="#e2e8f0"
+              strokeWidth={stroke}
+            />
+
+            {totalRuns > 0 &&
+              rows.map((item) => {
+                const value = Number(item.count || 0);
+                const pct = value / totalRuns;
+                const dash = pct * circumference;
+                const gap = circumference - dash;
+                const offset = -cumulative * circumference;
+                cumulative += pct;
+
+                return (
+                  <circle
+                    key={item.key}
+                    cx="60"
+                    cy="60"
+                    r={normalizedRadius}
+                    fill="transparent"
+                    stroke={item.color}
+                    strokeWidth={stroke}
+                    strokeDasharray={`${dash} ${gap}`}
+                    strokeDashoffset={offset}
+                    strokeLinecap="butt"
+                    transform="rotate(-90 60 60)"
+                  />
+                );
+              })}
+
+            <text x="60" y="56" textAnchor="middle" className="report-daily-trend-pie-total-text">
+              {totalRuns}
+            </text>
+            <text x="60" y="72" textAnchor="middle" className="report-daily-trend-pie-total-label">
+              TOTAL
+            </text>
+          </svg>
+        </div>
+
+        <div className="report-daily-trend-pie-legend">
+          {rows.map((item) => (
+            <div className="report-daily-trend-pie-legend-item" key={item.key}>
+              <span
+                className="report-daily-trend-pie-legend-dot"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="report-daily-trend-pie-legend-label">{item.label}</span>
+              <span className="report-daily-trend-pie-legend-value">
+                {item.count} ({item.percent})
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DailyTrendCaseTypeDistributionTable({ trend = {} }) {
+  const rows = getDailyTrendDistributionRows(trend);
+  const totalRuns = rows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+
+  return (
+    <div className="report-daily-trend-distribution-card">
+      <div className="report-daily-trend-distribution-head">
+        <div>
+          <h4>CASE TYPE DISTRIBUTION</h4>
+          <p>Summary of runs by case type for the selected period.</p>
+        </div>
+        <div className="report-daily-trend-distribution-total">
+          <span>Total Runs</span>
+          <strong>{totalRuns}</strong>
+        </div>
+      </div>
+
+      <table className="report-table report-table-sm report-daily-trend-distribution-table">
+        <thead>
+          <tr>
+            <th>CASE TYPE</th>
+            <th>NO. OF RUNS</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <td>
+                <span className="report-daily-trend-case-name">
+                  <span
+                    className="report-daily-trend-case-dot"
+                    style={{ backgroundColor: row.color }}
+                  />
+                  {row.label}
+                </span>
+              </td>
+              <td>{row.count}</td>
+              <td>{row.percent}</td>
+            </tr>
+          ))}
+          <tr className="total-row">
+            <td>TOTAL</td>
+            <td>{totalRuns}</td>
+            <td>{totalRuns > 0 ? "100%" : "0%"}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DailyTrendSummaryTable({ rows = [], allRows = [], showTotal = false, xLabel = "Day" }) {
+  const sourceRows = Array.isArray(allRows) && allRows.length ? allRows : rows;
+
+  const totals = DAILY_TREND_CASE_TYPES.reduce((acc, item) => {
+    acc[item.key] = sourceRows.reduce((sum, row) => {
+      return sum + getDailyTrendCountValue(row, item.key);
+    }, 0);
+    return acc;
+  }, {});
+
+  const grandTotal = sourceRows.reduce((sum, row) => {
+    return sum + Number(row?.count || 0);
+  }, 0);
+
+  const firstColumnLabel = String(xLabel || "Day").toUpperCase();
+
+  return (
+    <table className="report-table report-table-sm report-daily-trend-summary-table">
+      <thead>
+        <tr>
+          <th>{firstColumnLabel}</th>
+          {DAILY_TREND_CASE_TYPES.map((item) => (
+            <th key={item.key} style={{ borderTop: `1.2mm solid ${item.color}` }}>
+              {item.label}
+            </th>
+          ))}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length > 0 ? (
+          <>
+            {rows.map((row, index) => (
+              <tr key={`${row?.label || "period"}-${index}`}>
+                <td>{row?.label || "—"}</td>
+                {DAILY_TREND_CASE_TYPES.map((item) => (
+                  <td key={item.key}>{getDailyTrendCountValue(row, item.key)}</td>
+                ))}
+                <td>{Number(row?.count || 0)}</td>
+              </tr>
+            ))}
+
+            {showTotal && (
+              <tr className="total-row">
+                <td>TOTAL</td>
+                {DAILY_TREND_CASE_TYPES.map((item) => (
+                  <td key={item.key}>{totals[item.key] || 0}</td>
+                ))}
+                <td>{grandTotal}</td>
+              </tr>
+            )}
+          </>
+        ) : (
+          <tr>
+            <td colSpan={DAILY_TREND_CASE_TYPES.length + 2} className="empty-cell">
+              No data available.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function buildDailyTrendTablePages(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+
+  if (!list.length) return [[]];
+
+  const firstPageRows = list.slice(0, 18);
+  const remainingRows = list.slice(18);
+
+  return [firstPageRows, ...chunkArray(remainingRows, 18)];
+}
+
 function HeaderPreview() {
   const mcSeal = "cdrrmo_mc_seal.png";
   const mainSeal = "cdrrmo_seal.png";
@@ -1177,8 +2235,23 @@ function buildDetailedRunPages(rows = []) {
 
   if (!list.length) return [[]];
 
-  const rowsPerPage = 15;
-  return chunkArray(list, rowsPerPage);
+  const regularRowsPerPage = 10;
+  const finalRowsPerPage = 6;
+  const pages = [];
+  let index = 0;
+
+  while (list.length - index > finalRowsPerPage) {
+    const remaining = list.length - index;
+    const take = remaining - regularRowsPerPage <= finalRowsPerPage
+      ? Math.max(1, remaining - finalRowsPerPage)
+      : regularRowsPerPage;
+
+    pages.push(list.slice(index, index + take));
+    index += take;
+  }
+
+  pages.push(list.slice(index));
+  return pages;
 }
 
 function ReportSheet({
@@ -1195,6 +2268,8 @@ function ReportSheet({
   const showDetailed = reportView === "detailed";
   const showBarangay = reportView === "barangay";
   const showClassification = reportView === "classification";
+  const showAmbulance = reportView === "ambulance";
+  const showDailyTrend = reportView === "dailyTrend";
 
   const barangayRows = (reportData.barangaySummary || []).filter(
     (row) => row?.barangay !== "OTHERS"
@@ -1204,6 +2279,9 @@ function ReportSheet({
   const barangayPages = chunkArray(barangayRows, rowsPerPage);
   const detailedPages = buildDetailedRunPages(reportData.dailyRuns);
   const classificationPages = buildClassificationPages(reportData);
+  const dailyTrendTablePages = buildDailyTrendTablePages(reportData.dailyTrend?.rows);
+  const firstDailyTrendTablePage = dailyTrendTablePages[0] || [];
+  const remainingDailyTrendTablePages = dailyTrendTablePages.slice(1);
 
   return (
     <>
@@ -1230,8 +2308,12 @@ function ReportSheet({
                   <td className="text-right">{reportData.totals.averagePerDay ?? "—"}</td>
                 </tr>
                 <tr>
-                  <td>AVERAGE RESPONSE TIME within 5 km radius</td>
+                  <td>AVERAGE RESPOND TIME within 5km radius</td>
                   <td className="text-right">{reportData.totals.averageResponseTime ?? "—"}</td>
+                </tr>
+                <tr>
+                  <td>CONNECTING RUNS</td>
+                  <td className="text-right">{reportData.totals.connectingRuns ?? 0}</td>
                 </tr>
               </tbody>
             </table>
@@ -1335,13 +2417,134 @@ function ReportSheet({
                   </div>
                 </div>
 
-                <DailyRunsTable rows={pageRows} />
+                <DailyRunsTable
+                  rows={pageRows}
+                  showTotal={isLastDetailedPage}
+                  allRows={reportData.dailyRuns}
+                />
 
                 {isLastDetailedPage && <ApprovalFooter />}
               </div>
             );
           })}
         </>
+      )}
+
+      {showDailyTrend && (
+        <>
+          <div className="report-sheet report-sheet-daily-trend report-sheet-daily-trend-combined">
+            <HeaderPreview />
+
+            <div className="report-sheet-header">
+              <div>
+                <h3>DAILY RUNS TREND</h3>
+                <p>{dateLabel}</p>
+              </div>
+            </div>
+
+            <div className="report-daily-trend-first-page-stack">
+              <DailyRunsTrendBarGraph trend={reportData.dailyTrend} />
+              <DailyTrendCaseTypePieChart trend={reportData.dailyTrend} />
+            </div>
+          </div>
+
+          <div
+            className={`report-sheet report-sheet-daily-trend-distribution-page ${
+              dailyTrendTablePages.length === 1 ? "report-sheet-daily-trend-table-final" : ""
+            }`}
+          >
+            <HeaderPreview />
+
+            <div className="report-sheet-header">
+              <div>
+                <h3>CASE TYPE DISTRIBUTION</h3>
+                <p>{dateLabel} — Case Type Summary</p>
+              </div>
+            </div>
+
+            <DailyTrendCaseTypeDistributionTable trend={reportData.dailyTrend} />
+
+            <div className="report-daily-trend-table-under-distribution">
+              <div className="report-daily-trend-table-section-head">
+                <h4>DAILY RUNS TREND TABLE</h4>
+                <p>
+                  {dateLabel} — Table Page 1 of {dailyTrendTablePages.length}
+                </p>
+              </div>
+
+              <DailyTrendSummaryTable
+                rows={firstDailyTrendTablePage}
+                allRows={reportData.dailyTrend?.rows}
+                showTotal={dailyTrendTablePages.length === 1}
+                xLabel={reportData.dailyTrend?.xLabel}
+              />
+            </div>
+
+            {dailyTrendTablePages.length === 1 && <ApprovalFooter />}
+          </div>
+
+          {remainingDailyTrendTablePages.map((pageRows, pageIndex) => {
+            const actualPageIndex = pageIndex + 1;
+            const isLastTablePage = actualPageIndex === dailyTrendTablePages.length - 1;
+
+            return (
+              <div
+                className={`report-sheet report-sheet-daily-trend-table ${
+                  isLastTablePage ? "report-sheet-daily-trend-table-final" : ""
+                }`}
+                key={`daily-trend-table-page-${actualPageIndex}`}
+              >
+                <HeaderPreview />
+
+                <div className="report-sheet-header">
+                  <div>
+                    <h3>DAILY RUNS TREND TABLE</h3>
+                    <p>{dateLabel}</p>
+                  </div>
+                </div>
+
+                <div className="report-daily-trend-table-under-distribution report-daily-trend-table-under-distribution-standalone">
+                  <div className="report-daily-trend-table-section-head">
+                    <h4>DAILY RUNS TREND TABLE</h4>
+                    <p>
+                      {dateLabel} — Table Page {actualPageIndex + 1} of{" "}
+                      {dailyTrendTablePages.length}
+                    </p>
+                  </div>
+
+                  <DailyTrendSummaryTable
+                    rows={pageRows}
+                    allRows={reportData.dailyTrend?.rows}
+                    showTotal={isLastTablePage}
+                    xLabel={reportData.dailyTrend?.xLabel}
+                  />
+                </div>
+
+                {isLastTablePage && <ApprovalFooter />}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {showAmbulance && (
+        <div className="report-sheet report-sheet-ambulance-graph">
+          <HeaderPreview />
+
+          <div className="report-sheet-header">
+            <div>
+              <h3>AMBULANCE RUNS</h3>
+              <p>{dateLabel}</p>
+            </div>
+          </div>
+
+          <AmbulanceRunsBarGraph
+            rows={reportData.ambulanceRuns}
+            total={reportData.ambulanceRunsTotal}
+          />
+
+          <ApprovalFooter />
+        </div>
       )}
 
       {showBarangay &&
@@ -1400,6 +2603,33 @@ function ReportSheet({
         ))}
     </>
   );
+}
+
+function getReportFileBase(reportView, summaryType, selectedMonth, selectedQuarter, selectedYear) {
+  const viewLabel =
+    reportView === "summary"
+      ? "summary-of-ambulance-runs"
+      : reportView === "detailed"
+      ? "detailed-ambulance-runs"
+      : reportView === "ambulance"
+      ? "ambulance-runs-bar-graph"
+      : reportView === "dailyTrend"
+      ? "daily-runs-trend-bar-graph"
+      : reportView === "barangay"
+      ? "barangay-summary"
+      : "classification-summary";
+
+  if (summaryType === "Monthly") {
+    return `${viewLabel}-${selectedMonth}-${selectedYear}`;
+  }
+
+  if (summaryType === "Quarterly") {
+    return `${viewLabel}-${getQuarterLabel(selectedQuarter)
+      .replace(/\s+/g, "-")
+      .toLowerCase()}-${selectedYear}`;
+  }
+
+  return `${viewLabel}-annual-${selectedYear}`;
 }
 
 function Reports() {
@@ -1518,7 +2748,6 @@ function Reports() {
         await Promise.race([document.fonts.ready, wait(timeoutMs)]);
       }
     } catch {
-      // ignore
     }
   };
 
@@ -1957,7 +3186,6 @@ function Reports() {
     setShowPreview(false);
     setPreviewImages([]);
   };
-
   const handleDownloadPDF = async () => {
     if (isDownloading) return;
 
@@ -1975,23 +3203,13 @@ function Reports() {
         throw new Error("No preview images were generated.");
       }
 
-      const viewLabel =
-        reportView === "summary"
-          ? "summary-of-ambulance-runs"
-          : reportView === "detailed"
-          ? "detailed-ambulance-runs"
-          : reportView === "barangay"
-          ? "barangay-summary"
-          : "classification-summary";
-
-      const filename =
-        summaryType === "Monthly"
-          ? `${viewLabel}-${selectedMonth}-${selectedYear}.pdf`
-          : summaryType === "Quarterly"
-          ? `${viewLabel}-${getQuarterLabel(selectedQuarter)
-              .replace(/\s+/g, "-")
-              .toLowerCase()}-${selectedYear}.pdf`
-          : `${viewLabel}-annual-${selectedYear}.pdf`;
+      const filename = `${getReportFileBase(
+        reportView,
+        summaryType,
+        selectedMonth,
+        selectedQuarter,
+        selectedYear
+      )}.pdf`;
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -2074,6 +3292,8 @@ function Reports() {
                 >
                   <option value="summary">Summary of Ambulance Runs</option>
                   <option value="detailed">Detailed Ambulance Runs</option>
+                  <option value="dailyTrend">Daily Runs Trend Bar Graph</option>
+                  <option value="ambulance">Ambulance Runs Bar Graph</option>
                   <option value="barangay">Barangay Summary</option>
                   <option value="classification">Classification Summary</option>
                 </select>

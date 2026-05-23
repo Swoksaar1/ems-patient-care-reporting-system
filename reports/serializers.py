@@ -27,6 +27,92 @@ def clean_age(value):
     return "".join(ch for ch in value if ch.isdigit())[:3]
 
 
+
+
+def normalize_ambulance_body_no(value):
+    text = "" if value is None else str(value).strip()
+
+    if not text:
+        return ""
+
+    normalized = text.upper().replace(".", "").replace("-", " ")
+    normalized = " ".join(normalized.split())
+
+    if "PTV" in normalized and "70102" in normalized:
+        return "PTV 70102"
+
+    if "SND" in normalized and "2439" in normalized:
+        return "SND 2439"
+
+    if "SKA" in normalized and "1130" in normalized:
+        return "SKA 1130"
+
+    if (
+        "CITY AMBU 6651" in normalized
+        or "CITY AMBULANCE 6651" in normalized
+        or "AMBU 6651" in normalized
+        or "AMBULANCE 6651" in normalized
+        or normalized == "6651"
+    ):
+        return "City Ambu 6651"
+
+    return text
+
+def normalize_connecting_runs(value):
+    text = "" if value is None else str(value).strip().lower()
+
+    if not text or text in {"na", "n/a", "none", "null", "undefined"}:
+        return "na"
+
+    if text in {"yes", "y", "true", "1", "connecting", "connected"}:
+        return "yes"
+
+    if text in {"no", "n", "false", "0"}:
+        return "no"
+
+    if "connect" in text:
+        return "yes"
+
+    return "na"
+
+
+def normalize_facility_name(value):
+    text = "" if value is None else str(value).strip()
+
+    if not text:
+        return ""
+
+    normalized = text.upper().replace(".", "").replace("-", " ")
+    normalized = " ".join(normalized.split())
+
+    st_jude_aliases = {
+        "SJTGH",
+        "ST JUDE",
+        "ST JUDE HOSPITAL",
+        "ST JUDE THADDEUS GENERAL HOSPITAL",
+        "SAINT JUDE",
+        "SAINT JUDE HOSPITAL",
+        "SAINT JUDE THADDEUS GENERAL HOSPITAL",
+    }
+
+    if normalized in st_jude_aliases:
+        return "St. Jude"
+
+    hospital_to_home_aliases = {
+        "HOME",
+        "HOSPITAL TO HOME",
+        "HOSPITAL HOME",
+        "TRANSPORT TO HOME",
+        "DISCHARGE TO HOME",
+        "FROM HOSPITAL TO HOME",
+    }
+
+    if normalized in hospital_to_home_aliases:
+        return "Hospital to Home"
+
+    return text
+
+
 class PatientSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     age = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="", max_length=3)
@@ -140,6 +226,7 @@ class ReportListSerializer(AttachmentMixin):
             "chief_complaint",
             "ambulance_body_no",
             "case_type",
+            "connecting_runs",
             "patient_location",
             "transported_to",
             "doi",
@@ -151,6 +238,7 @@ class ReportListSerializer(AttachmentMixin):
             "arrived_scene_time",
             "left_scene_time",
             "arrived_hospital_time",
+            "left_hospital_time",
             "back_in_service_time",
             "intervention_notes",
             "apgar_enabled",
@@ -190,6 +278,7 @@ class ReportDetailSerializer(AttachmentMixin):
             "patient",
             "ambulance_body_no",
             "case_type",
+            "connecting_runs",
             "patient_location",
             "transported_to",
             "doi",
@@ -201,6 +290,7 @@ class ReportDetailSerializer(AttachmentMixin):
             "arrived_scene_time",
             "left_scene_time",
             "arrived_hospital_time",
+            "left_hospital_time",
             "back_in_service_time",
             "intervention_notes",
             "apgar_enabled",
@@ -230,6 +320,7 @@ class PatientPayloadSerializer(serializers.Serializer):
     chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     assessment = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     case_type = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    connecting_runs = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="na")
 
 
 class GCSPayloadSerializer(serializers.Serializer):
@@ -303,6 +394,7 @@ class ReportCreateSerializer(serializers.Serializer):
     chief_complaint = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     assessment = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     case_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    connecting_runs = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="na")
 
     case_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     ambulance_body_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -321,6 +413,7 @@ class ReportCreateSerializer(serializers.Serializer):
     arrived_scene_time = serializers.DateTimeField(required=False, allow_null=True)
     left_scene_time = serializers.DateTimeField(required=False, allow_null=True)
     arrived_hospital_time = serializers.DateTimeField(required=False, allow_null=True)
+    left_hospital_time = serializers.DateTimeField(required=False, allow_null=True)
     back_in_service_time = serializers.DateTimeField(required=False, allow_null=True)
 
     intervention_notes = serializers.CharField(required=False, allow_blank=True)
@@ -337,7 +430,18 @@ class ReportCreateSerializer(serializers.Serializer):
     attachment = serializers.ImageField(required=False, allow_null=True)
 
     def validate(self, attrs):
+        if "ambulance_body_no" in attrs:
+            attrs["ambulance_body_no"] = normalize_ambulance_body_no(attrs.get("ambulance_body_no"))
+
+        if "transported_to" in attrs:
+            attrs["transported_to"] = normalize_facility_name(attrs.get("transported_to"))
+
         patient_data = attrs.get("patient") or {}
+
+        if "connecting_runs" in attrs:
+            attrs["connecting_runs"] = normalize_connecting_runs(attrs.get("connecting_runs"))
+        elif "connecting_runs" in patient_data:
+            attrs["connecting_runs"] = normalize_connecting_runs(patient_data.get("connecting_runs"))
 
         current_case_type = ""
         if self.instance is not None:
@@ -446,10 +550,11 @@ class ReportCreateSerializer(serializers.Serializer):
         report = Report.objects.create(
             patient=patient,
             case_no=validated_data.get("case_no", "") or "",
-            ambulance_body_no=validated_data.get("ambulance_body_no", "") or "",
+            ambulance_body_no=normalize_ambulance_body_no(validated_data.get("ambulance_body_no")),
             case_type=validated_data.get("case_type", "medical") or "medical",
+            connecting_runs=normalize_connecting_runs(validated_data.get("connecting_runs", "na")),
             patient_location=validated_data.get("patient_location", ""),
-            transported_to=validated_data.get("transported_to", ""),
+            transported_to=normalize_facility_name(validated_data.get("transported_to", "")),
             doi=validated_data.get("doi"),
             toi=validated_data.get("toi"),
             poi=validated_data.get("poi", ""),
@@ -460,6 +565,7 @@ class ReportCreateSerializer(serializers.Serializer):
             arrived_scene_time=validated_data.get("arrived_scene_time"),
             left_scene_time=validated_data.get("left_scene_time"),
             arrived_hospital_time=validated_data.get("arrived_hospital_time"),
+            left_hospital_time=validated_data.get("left_hospital_time"),
             back_in_service_time=validated_data.get("back_in_service_time"),
             intervention_notes=validated_data.get("intervention_notes", ""),
             apgar_enabled=bool(apgar_data),
@@ -548,6 +654,7 @@ class ReportCreateSerializer(serializers.Serializer):
             "case_no",
             "ambulance_body_no",
             "case_type",
+            "connecting_runs",
             "patient_location",
             "transported_to",
             "doi",
@@ -560,13 +667,21 @@ class ReportCreateSerializer(serializers.Serializer):
             "arrived_scene_time",
             "left_scene_time",
             "arrived_hospital_time",
+            "left_hospital_time",
             "back_in_service_time",
             "intervention_notes",
         ]
 
         for field in report_fields:
             if field in validated_data:
-                setattr(instance, field, validated_data.get(field))
+                value = validated_data.get(field)
+                if field == "ambulance_body_no":
+                    value = normalize_ambulance_body_no(value)
+                if field == "transported_to":
+                    value = normalize_facility_name(value)
+                if field == "connecting_runs":
+                    value = normalize_connecting_runs(value)
+                setattr(instance, field, value)
 
         if "attachment" in validated_data:
             instance.attachment = validated_data.get("attachment")
